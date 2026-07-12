@@ -1,0 +1,84 @@
+{
+  "projectId": "525946347121279815",
+  "screens": [
+    {
+      "file": "bulk-grade-release-7d6d4492e95f4835aff0dcb33063ba50.get_screen.json",
+      "title": "Bulk Grade Release",
+      "screenId": "7d6d4492e95f4835aff0dcb33063ba50",
+      "deviceType": "MOBILE",
+      "width": "768",
+      "height": "1376",
+      "screenshotUrl": "https://lh3.googleusercontent.com/aida/ADBb0ujj0-sPvYbp2nuW2ioHuhb9LT13QbZ-QYxsNz0lfXuMD_IrUMvzSgO073dKOfC7boc4aVrNyvXcrNSiNtLOiUyo1Hpp1kUxP381H-jfXy7svE8DhO_bmYPStF-L2AhGYOP9jsHKoAWULn-D4k5TqHMsmy73ZtMf712UOuLNRk2YHb51RHHtRRhC3IboAKiT5NYJmwxesyXayWPXdPTGJMRt1y7DJ2Ysxtl27pPBAMzdgMdOdM6r0R4QTw",
+      "htmlCodeName": null,
+      "htmlCodeUrl": null
+    },
+    {
+      "file": "scan-batch-tests-eda0ad486d75440fab7028e8ec5c49d4.get_screen.json",
+      "title": "Scan & Batch Tests",
+      "screenId": "eda0ad486d75440fab7028e8ec5c49d4",
+      "deviceType": "MOBILE",
+      "width": "768",
+      "height": "1376",
+      "screenshotUrl": "https://lh3.googleusercontent.com/aida/ADBb0ugMDI4Hip2Tc6Uro89VQMuSDT57TcoAwQHiKWNL75p_JcN0bojjE4xC1zxyD_mLSF4Ni_yUAv8SkL8g_v3rVGmIcfPb3R_UDaqNGH9OwY0x8TkIBdQLloTz2-uIz8IQnWLpyeFXrNCepbg9GZHhVC-CwosdF0RJIsfUYmwRTiZfi4R8p4u3qd75W-2uv6H4TDKJqeqkfWtt4_351rFPuzg1ua0cGdybHPb7y5HbNf1GrDuXqH3fVtW5_A",
+      "htmlCodeName": null,
+      "htmlCodeUrl": null
+    },
+    {
+      "file": "screenshot-2026-05-28-at-6-32-05-am-png-15297591760856015972.get_screen.json",
+      "title": "Screenshot 2026-05-28 at 6.32.05 AM.png",
+      "screenId": "15297591760856015972",
+      "deviceType": null,
+      "width": "990",
+      "height": "1994",
+      "screenshotUrl": "https://lh3.googleusercontent.com/aida/ADBb0uguoobrjzKfOf_mpajyxwt3j1HW5zyUrr-PPwf3hnkvX2_WrIApC7VnUwuTvZ3k4wId2hEWqFYcCtBxEvGzI4n0jkr7OASiQsdrolUhohSPe5lFHmSKvhIt81QYCW2xV2BFLQ1lUBjB8uUekYSl4-TVL9jDIN6QozmpG4NLLXM1jX4uBnLAhQ5t7l285v-Xl_I844Y791POFWVHnNgvmXNIk4oSiOhYdncR81BQoQAkAE-eoXKIXB2QRUSpewyzJOIRV2cDpP6j",
+      "htmlCodeName": null,
+      "htmlCodeUrl": null
+    },
+    {
+      "file": "screenshot-2026-05-28-at-6-34-56-am-png-15297591760856016090.get_screen.json",
+      "title": "Screenshot 2026-05-28 at 6.34.56 AM.png",
+      "screenId": "15297591760856016090",
+      "deviceType": null,
+      "width": "1082",
+      "height": "1980",
+      "screenshotUrl": "https://lh3.googleusercontent.com/aida/ADBb0uiVy3EtD4IbOijJ0ifTAmsGH7YkCIftdsQMmKr2dvh4uu-NApQoRhRF376NkuCXxtcRFcphyS0kGOp8vm4Lxa-kMiv-EmyofFUBGCNZ_EG1qhMX6xZMyBKJZ7AJ8KRdIMb_YtqxpRUBlFq-nYT25SCTxeabUpQIEoZnvdFAfQXNLa5Bxwzj6_p3-JRoPxIRo9Z9rmbuxaWByvJEcMqrVuQWHhSwtcQVfDl8m26aciNqc8O37GH2tJIJtl_X75u5WpBYNmAcUy4k",
+      "htmlCodeName": null,
+      "htmlCodeUrl": null
+    },
+    {
+      "file": "student-grade-review-2ceec900138f42a7a8a1aeaacbaee638.get_screen.json",
+      "title": "Student Grade Review",
+      "screenId": "2ceec900138f42a7a8a1aeaacbaee638",
+      "deviceType": "MOBILE",
+      "width": "768",
+      "height": "1376",
+      "screenshotUrl": "https://lh3.googleusercontent.com/aida/ADBb0ujrkM2riXvpn2vxuSf91NSwdeUbIsQgVJmBBCeuf7FTppYadCcfkqlm6T5C8Ed7EOaFgpAVXOiUIuMQhZvjhnyirk8fWZ1rWwIFaVmcWmq6eEsVo1Rvj_PXffMVq4VpsT92DOUUxdqMiNiJWW5seWsEWLNBIQRX-aCZJuuzPiMhYGeK2zgqqjRUaQYqynN8xcU9HhoMWk0u2HY2QVjkbCXOKru6k3adtz9X3LUe7CcGUeHsErMKqrYkyg",
+      "htmlCodeName": null,
+      "htmlCodeUrl": null
+    },
+    {
+      "file": "student-grade-review.get_screen.json",
+      "title": "Student Grade Review",
+      "screenId": "2ceec900138f42a7a8a1aeaacbaee638",
+      "deviceType": "MOBILE",
+      "width": "768",
+      "height": "1376",
+      "screenshotUrl": "https://lh3.googleusercontent.com/aida/ADBb0ujrkM2riXvpn2vxuSf91NSwdeUbIsQgVJmBBCeuf7FTppYadCcfkqlm6T5C8Ed7EOaFgpAVXOiUIuMQhZvjhnyirk8fWZ1rWwIFaVmcWmq6eEsVo1Rvj_PXffMVq4VpsT92DOUUxdqMiNiJWW5seWsEWLNBIQRX-aCZJuuzPiMhYGeK2zgqqjRUaQYqynN8xcU9HhoMWk0u2HY2QVjkbCXOKru6k3adtz9X3LUe7CcGUeHsErMKqrYkyg",
+      "htmlCodeName": null,
+      "htmlCodeUrl": null
+    },
+    {
+      "file": "test-print-settings-847cf07ccbd745ff877ef4d32e139bef.get_screen.json",
+      "title": "Test Print Settings",
+      "screenId": "847cf07ccbd745ff877ef4d32e139bef",
+      "deviceType": "MOBILE",
+      "width": "768",
+      "height": "1376",
+      "screenshotUrl": "https://lh3.googleusercontent.com/aida/ADBb0uha1rzBZjChjKb6kz11jdJqjT_6YeU6a-Lhsw2KEIlPmDTz7tKYaJSyw5pIGZG-MhbwlRX0fiO6Ty5KFp_QXE4bTwxBbOh9ul5fAWCqcxX7sjVYJqwVv8m7YFRALP_cxdk89bUnwkhOppNIrUooHN4Mx8gOsaRoBk_ZpEer59VY6LiuolhvudZxLr26OWAyxtVOLSQayS_DXnId8q-3qnuH2B6GPq05QfO7TD0Pcefugb-M6vUxbs8kNA",
+      "htmlCodeName": null,
+      "htmlCodeUrl": null
+    }
+  ],
+  "htmlCodeAvailable": 0,
+  "totalScreens": 7
+}
