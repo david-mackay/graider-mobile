@@ -228,6 +228,7 @@ export default function TeacherDashboard() {
             showPaywall("soft_upsell");
           }
         }}
+        onOpenAccount={() => router.push("/(teacher)/account")}
       />
 
       <View className="flex-1">

@@ -107,7 +107,7 @@ function RootLayoutNav() {
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
-        <Stack.Screen name="(student)/index" />
+        <Stack.Screen name="(student)" />
         <Stack.Screen name="(teacher)" />
         <Stack.Screen name="(marketing)" />
         <Stack.Screen name="onboarding-sync" />

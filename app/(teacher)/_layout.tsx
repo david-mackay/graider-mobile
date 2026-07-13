@@ -9,6 +9,7 @@ export default function TeacherLayout() {
       <Stack.Screen name="students/[studentId]" />
       <Stack.Screen name="tests/bulk-release" />
       <Stack.Screen name="tests/print-settings" />
+      <Stack.Screen name="account" />
     </Stack>
   );
 }

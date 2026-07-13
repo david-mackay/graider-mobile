@@ -44,11 +44,13 @@ export function TeacherTopBar({
   profileName,
   subscriptionLabel,
   onManageSubscription,
+  onOpenAccount,
 }: {
   activeClassName: string | null;
   profileName: string | null;
   subscriptionLabel?: string | null;
   onManageSubscription?: () => void;
+  onOpenAccount?: () => void;
 }) {
   const insets = useSafeAreaInsets();
 
@@ -83,11 +85,16 @@ export function TeacherTopBar({
             </Pressable>
           ) : null}
           {profileName ? (
-            <View className="h-9 w-9 items-center justify-center rounded-full bg-cream-deep">
+            <Pressable
+              onPress={onOpenAccount}
+              accessibilityRole="button"
+              accessibilityLabel="Account settings"
+              className="h-9 w-9 items-center justify-center rounded-full bg-cream-deep"
+            >
               <Text className="font-display text-sm font-bold text-pen">
                 {profileName.charAt(0).toUpperCase()}
               </Text>
-            </View>
+            </Pressable>
           ) : null}
         </View>
       </View>

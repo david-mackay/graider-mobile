@@ -36,11 +36,13 @@ function StudentTopBar({
   selectedClassId,
   onSelectClass,
   profileName,
+  onOpenAccount,
 }: {
   classes: DashboardClass[];
   selectedClassId: string;
   onSelectClass: (id: string) => void;
   profileName: string | null;
+  onOpenAccount?: () => void;
 }) {
   return (
     <View className="border-b border-line bg-paper/90 px-4 pb-3 pt-3">
@@ -53,9 +55,14 @@ function StudentTopBar({
           </View>
         </View>
         {profileName ? (
-          <View className="h-9 w-9 items-center justify-center rounded-full bg-cream-deep">
+          <TouchableOpacity
+            onPress={onOpenAccount}
+            accessibilityRole="button"
+            accessibilityLabel="Account settings"
+            className="h-9 w-9 items-center justify-center rounded-full bg-cream-deep"
+          >
             <Text className="font-display text-sm font-bold text-pen">{profileName.charAt(0).toUpperCase()}</Text>
-          </View>
+          </TouchableOpacity>
         ) : null}
       </View>
       <View className="overflow-hidden rounded-xl border border-line bg-cream">
@@ -356,6 +363,7 @@ export default function StudentDashboard() {
         selectedClassId={selectedClassId}
         onSelectClass={setSelectedClassId}
         profileName={profileName}
+        onOpenAccount={() => router.push("/(student)/account")}
       />
 
       <View className="flex-1">
