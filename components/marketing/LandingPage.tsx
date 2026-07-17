@@ -1,8 +1,9 @@
-import { View, Text, Pressable, ScrollView, ActivityIndicator } from "react-native";
+import { useState } from "react";
+import { View, Text, Pressable, ScrollView } from "react-native";
 import { Link } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import VaultResumeGate from "./VaultResumeGate";
-import { useGraiderSignIn } from "@/lib/auth/use-graider-sign-in";
+import AuthMethodPanel from "@/components/shared/AuthMethodPanel";
 
 function GradedPaper() {
   return (
@@ -62,7 +63,7 @@ const STEPS = [
 ];
 
 export default function LandingPage() {
-  const { signIn, isSigningIn } = useGraiderSignIn({ redirectTo: "/(teacher)" });
+  const [showSignIn, setShowSignIn] = useState(false);
 
   return (
     <SafeAreaView className="flex-1 bg-cream" edges={["top", "bottom"]}>
@@ -85,24 +86,28 @@ export default function LandingPage() {
           <View className="mt-9 w-full items-center gap-4">
             <Link href="/onboarding/hook" asChild>
               <Pressable className="w-full items-center rounded-full bg-pen px-8 py-3.5 shadow-lifted active:scale-[0.97]">
-                <Text className="text-base font-bold text-white">Grade a sample paper</Text>
+                <Text className="text-base font-bold text-white">Grade your first paper</Text>
               </Pressable>
             </Link>
-            <Pressable
-              onPress={() => void signIn()}
-              disabled={isSigningIn}
-              className="py-1"
-              accessibilityRole="button"
-              accessibilityLabel="Sign in to your existing account"
-            >
-              {isSigningIn ? (
-                <ActivityIndicator size="small" color="#6f6151" />
-              ) : (
+            {showSignIn ? (
+              <View className="w-full">
+                <AuthMethodPanel redirectTo="/(teacher)" intent="sign-in" />
+                <Pressable onPress={() => setShowSignIn(false)} className="mt-3 py-1">
+                  <Text className="text-center text-xs font-bold text-ink-faint">Cancel</Text>
+                </Pressable>
+              </View>
+            ) : (
+              <Pressable
+                onPress={() => setShowSignIn(true)}
+                className="py-1"
+                accessibilityRole="button"
+                accessibilityLabel="Sign in to your existing account"
+              >
                 <Text className="text-sm font-bold text-ink-soft underline decoration-line underline-offset-4">
                   I already have an account
                 </Text>
-              )}
-            </Pressable>
+              </Pressable>
+            )}
             <Text className="text-xs text-ink-faint">Free to try — no card, no setup, two minutes.</Text>
           </View>
 

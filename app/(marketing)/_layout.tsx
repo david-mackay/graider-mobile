@@ -1,20 +1,18 @@
-import { useEffect } from "react";
-import { Redirect, Stack } from "expo-router";
+import { Redirect, Stack, useSegments } from "expo-router";
 import { useAuth } from "@clerk/clerk-expo";
-import { clearVault } from "@/lib/onboarding/vault";
 
 export default function MarketingLayout() {
   const { isLoaded, isSignedIn } = useAuth();
-
-  useEffect(() => {
-    if (isSignedIn) void clearVault();
-  }, [isSignedIn]);
+  const segments = useSegments();
+  // Onboarding save signs the user in, then navigates to /onboarding-sync to
+  // POST the vault. Do NOT bounce to the dashboard mid-onboarding.
+  const inOnboarding = (segments as string[]).includes("onboarding");
 
   if (!isLoaded) {
     return null;
   }
 
-  if (isSignedIn) {
+  if (isSignedIn && !inOnboarding) {
     return <Redirect href="/(teacher)" />;
   }
 

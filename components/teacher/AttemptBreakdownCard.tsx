@@ -1,6 +1,7 @@
 import { View, Text, Pressable, ScrollView } from "react-native";
 import { Badge, Card, btnSecondary } from "@/components/shared/ui";
 import ExportGradePdfButton from "@/components/shared/ExportGradePdfButton";
+import GradedQuestionBreakdown from "@/components/shared/GradedQuestionBreakdown";
 import UploadAssetImage from "@/components/shared/UploadAssetImage";
 import type { GradedAttemptDetail } from "@/lib/dashboard-types";
 
@@ -80,19 +81,16 @@ export default function AttemptBreakdownCard({
       ) : null}
 
       {attempt.questions.length > 0 ? (
-        <View className="mt-4 gap-2">
-          {attempt.questions.map((question, index) => (
-            <View key={question.question_id} className="rounded-lg border border-line bg-paper px-3 py-2">
-              <Text className="text-xs font-semibold uppercase tracking-wide text-ink-faint">
-                Question {index + 1}
-              </Text>
-              <Text className="mt-1 text-sm text-ink">{question.prompt}</Text>
-              <Text className="mt-2 text-sm text-ink-soft">Answer: {question.student_answer || "—"}</Text>
-              {question.feedback ? (
-                <Text className="mt-2 text-xs text-moss-deep">{question.feedback}</Text>
-              ) : null}
-            </View>
-          ))}
+        <View className="mt-4">
+          <GradedQuestionBreakdown
+            questions={attempt.questions.map((question) => ({
+              prompt: question.prompt,
+              studentAnswer: question.student_answer,
+              feedback: question.feedback ?? undefined,
+              marksEarned: question.marks_earned ?? 0,
+              maxMarks: question.marks,
+            }))}
+          />
         </View>
       ) : null}
 

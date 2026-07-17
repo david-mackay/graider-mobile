@@ -123,10 +123,30 @@ Share the install link from expo.dev. **Not Expo Go** — camera and native modu
 
 ## Versioning
 
-- `app.json` → `expo.version` is the user-facing version.
-- `eas.json` → `production.autoIncrement` bumps **build number** per EAS build.
-- Bump `expo.version` for each new store submission.
-- `runtimeVersion` uses the **appVersion** policy — bump `expo.version` when native modules change and you need a new store build; JS-only fixes can ship via OTA on the same runtime version.
+- `app.json` → `expo.version` is the user-facing version (**and** the EAS Update `runtimeVersion` via `appVersion` policy).
+- `eas.json` → `production.autoIncrement` bumps **build number** per EAS build (remote).
+- Bump `expo.version` for each new store submission that needs a new native binary / OTA runtime.
+- Account → footer shows `version (build) · ota …` so you can confirm which binary + OTA bundle is running.
+
+### Store update gates (`/api/app-version`)
+
+Mobile polls `GET /api/app-version` on launch and foreground:
+
+| Field | Meaning |
+|-------|---------|
+| `minVersion` | Binary below this → **force** App Store / Play update (OTA skipped) |
+| `latestVersion` | Binary below this → soft “Update available” prompt (dismissible once per latest) |
+| `storeUrl` | Opens the listing; set `MOBILE_IOS_STORE_URL` after App Store Connect exists |
+
+Defaults live in `graider/lib/mobile-app-version.ts`. Override with env on Vercel without a code change.
+
+**When you ship a breaking native build (e.g. 1.0.0 → 1.1.0):**
+
+1. Bump `expo.version` in `app.json` / `package.json`.
+2. Build + submit the new binary.
+3. After it is live, set `minVersion` (or `latestVersion` for soft) to the new version so older installs are prompted.
+
+JS-only fixes on the same `expo.version` → `pnpm run update:production` (OTA). Old binaries keep receiving OTAs until you raise `minVersion`.
 
 ---
 

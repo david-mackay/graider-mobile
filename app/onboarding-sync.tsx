@@ -5,6 +5,7 @@ import { router } from "expo-router";
 import { Sparkles } from "lucide-react-native";
 import { clearVault, getVault } from "@/lib/onboarding/vault";
 import { ONBOARDING_EVENTS, fireEvent } from "@/lib/onboarding/funnel-events";
+import { hasGradedStudents } from "@/lib/onboarding/types";
 import { useGraiderFetch } from "@/lib/graider-fetch";
 import type { OnboardingSyncResponse } from "@/lib/types";
 
@@ -21,9 +22,9 @@ export default function OnboardingSyncPage() {
   async function runSync() {
     setState({ kind: "loading" });
     const vault = await getVault();
-    if (!vault || !vault.sampleGrade) {
+    if (!vault || !hasGradedStudents(vault)) {
       setState({ kind: "redirecting" });
-      router.replace("/(teacher)/grade");
+      router.replace("/(teacher)");
       return;
     }
 
@@ -37,15 +38,14 @@ export default function OnboardingSyncPage() {
       if (!res.ok) {
         setState({
           kind: "error",
-          message: payload.error ?? "We couldn't save your first graded test. Try again.",
+          message: payload.error ?? "We couldn't save your graded class. Try again.",
         });
         return;
       }
       fireEvent(ONBOARDING_EVENTS.CLASS_SYNCED, { created: payload.created });
       await clearVault();
       setState({ kind: "redirecting" });
-      // In mobile, we route to teacher grade tab
-      router.replace("/(teacher)/grade");
+      router.replace("/(teacher)");
     } catch (err) {
       setState({
         kind: "error",
@@ -73,10 +73,10 @@ export default function OnboardingSyncPage() {
             {state.kind === "loading" || state.kind === "redirecting" ? (
               <View className="items-center">
                 <Text className="text-lg font-bold text-ink">
-                  Saving your first graded test...
+                  Saving your graded class...
                 </Text>
                 <Text className="mt-2 text-center text-sm text-ink-soft">
-                  Setting up your starter class and seeding the sample grade.
+                  Setting up your starter class and adding each graded student.
                 </Text>
                 <View className="mt-6">
                   <ActivityIndicator size="large" color="#be3a2e" />
@@ -90,7 +90,7 @@ export default function OnboardingSyncPage() {
                 <Text className="mt-2 text-center text-sm text-pen-deep">{state.message}</Text>
                 <View className="mt-5 w-full flex-row gap-3">
                   <TouchableOpacity
-                    onPress={() => router.push("/(teacher)/grade")}
+                    onPress={() => router.push("/(teacher)")}
                     className="flex-1 items-center justify-center rounded-2xl bg-paper border border-line py-3"
                   >
                     <Text className="text-sm font-semibold text-ink">Skip</Text>

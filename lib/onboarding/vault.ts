@@ -2,6 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   ONBOARDING_VAULT_VERSION,
   hasAnswerKey,
+  hasGradedStudents,
   type OnboardingStep,
   type OnboardingVault,
 } from "./types";
@@ -80,9 +81,8 @@ export async function clearVault(): Promise<void> {
 
 export function getResumeStep(vault: OnboardingVault | null): OnboardingStep {
   if (!vault || !hasAnswerKey(vault)) return "hook";
-  if (!vault.studentPaper) return "upload";
-  if (!vault.sampleGrade) return "result";
-  if (!vault.completedAt) return "save";
+  if (!hasGradedStudents(vault)) return "upload";
+  if (!vault.completedAt) return "result";
   if (vault.syncedAt) return "completed";
   return "save";
 }

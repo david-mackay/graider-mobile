@@ -1,5 +1,6 @@
-export const ONBOARDING_VAULT_VERSION = 1 as const;
+export const ONBOARDING_VAULT_VERSION = 2 as const;
 export const ONBOARDING_MAX_ANSWER_KEYS = 8;
+export const ONBOARDING_MAX_STUDENTS = 5;
 
 export type OnboardingAnswerKey = {
   prompt: string;
@@ -32,6 +33,47 @@ export type OnboardingSampleGrade = {
   questions?: OnboardingQuestionGrade[];
 };
 
+/** Flatten sample grade into per-question rows for the shared breakdown UI. */
+export function onboardingGradeQuestions(
+  grade: OnboardingSampleGrade,
+): Array<{
+  prompt: string;
+  studentAnswer: string;
+  feedback: string;
+  marksEarned: number;
+  maxMarks: number;
+}> {
+  if (grade.questions && grade.questions.length > 0) {
+    return grade.questions.map((q) => ({
+      prompt: q.prompt,
+      studentAnswer: q.ocrAnswerText,
+      feedback: q.feedback,
+      marksEarned: q.marksEarned,
+      maxMarks: q.maxMarks,
+    }));
+  }
+  return [
+    {
+      prompt: "Response",
+      studentAnswer: grade.ocrAnswerText,
+      feedback: grade.feedback,
+      marksEarned: grade.marksEarned,
+      maxMarks: grade.maxMarks,
+    },
+  ];
+}
+
+export type OnboardingStudentSubmission = {
+  id: string;
+  name: string;
+  source: "photo" | "typed";
+  /** All pages for this student's paper (multi-page support). */
+  papers?: OnboardingPaper[];
+  typedAnswers?: string[];
+  /** Set after the class is graded — absent while still collecting the roster. */
+  grade?: OnboardingSampleGrade;
+};
+
 export type OnboardingVault = {
   schemaVersion: typeof ONBOARDING_VAULT_VERSION;
   startedAt: string;
@@ -39,8 +81,8 @@ export type OnboardingVault = {
   answerKeys?: OnboardingAnswerKey[];
   answerKey?: OnboardingAnswerKey;
   answerKeySource?: "pdf" | "manual";
-  studentPaper?: OnboardingPaper;
-  sampleGrade?: OnboardingSampleGrade;
+  /** One graded student per stack photo or typed answer. */
+  students?: OnboardingStudentSubmission[];
   syncedAt?: string;
 };
 
@@ -90,16 +132,69 @@ export function hasAnswerKey(
   return normalizeAnswerKeys(vault).length > 0;
 }
 
+export function normalizeRoster(
+  vault: Pick<OnboardingVault, "students"> | null | undefined,
+): OnboardingStudentSubmission[] {
+  if (!vault?.students?.length) return [];
+  return vault.students.filter(
+    (s) =>
+      s &&
+      typeof s.id === "string" &&
+      typeof s.name === "string" &&
+      (s.source === "photo" || s.source === "typed") &&
+      ((s.source === "photo" && (s.papers?.length ?? 0) > 0) ||
+        (s.source === "typed" && (s.typedAnswers?.some((a) => a.trim()) ?? false))),
+  );
+}
+
+export function hasRoster(
+  vault: Pick<OnboardingVault, "students"> | null | undefined,
+): boolean {
+  return normalizeRoster(vault).length > 0;
+}
+
+/** Students that already have a grade (ready for result / sync). */
+export type GradedOnboardingStudent = OnboardingStudentSubmission & {
+  grade: OnboardingSampleGrade;
+};
+
+export function normalizeStudents(
+  vault: Pick<OnboardingVault, "students"> | null | undefined,
+): GradedOnboardingStudent[] {
+  return normalizeRoster(vault).filter(
+    (s): s is GradedOnboardingStudent =>
+      !!s.grade &&
+      Number.isInteger(s.grade.marksEarned) &&
+      Number.isInteger(s.grade.maxMarks),
+  );
+}
+
+export function hasGradedStudents(
+  vault: Pick<OnboardingVault, "students"> | null | undefined,
+): boolean {
+  const roster = normalizeRoster(vault);
+  if (roster.length === 0) return false;
+  return roster.every(
+    (s) =>
+      !!s.grade &&
+      Number.isInteger(s.grade.marksEarned) &&
+      Number.isInteger(s.grade.maxMarks),
+  );
+}
+
 export function answerKeyVaultUpdate(
   keys: OnboardingAnswerKey[],
   source: "pdf" | "manual",
-): Pick<OnboardingVault, "answerKeys" | "answerKey" | "answerKeySource" | "sampleGrade" | "completedAt"> {
+): Pick<
+  OnboardingVault,
+  "answerKeys" | "answerKey" | "answerKeySource" | "students" | "completedAt"
+> {
   const trimmed = keys.slice(0, ONBOARDING_MAX_ANSWER_KEYS);
   return {
     answerKeys: trimmed,
     answerKey: trimmed[0],
     answerKeySource: source,
-    sampleGrade: undefined,
+    students: undefined,
     completedAt: undefined,
   };
 }

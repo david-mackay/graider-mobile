@@ -11,6 +11,7 @@ import { useAuth, useUser } from "@clerk/clerk-expo";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BrandMark, Wordmark } from "@/components/shared/Brand";
+import { formatAppVersionLabel, getNativeAppIdentity } from "@/lib/app-version";
 import { useGraiderFetch } from "@/lib/graider-fetch";
 import { handleJson } from "@/lib/dashboard-client";
 
@@ -25,6 +26,8 @@ export default function AccountSettingsView({ backHref }: AccountSettingsViewPro
   const { user } = useUser();
   const graiderFetch = useGraiderFetch();
   const [busy, setBusy] = useState(false);
+  const versionIdentity = getNativeAppIdentity();
+  const versionLabel = formatAppVersionLabel(versionIdentity);
 
   const displayName =
     user?.fullName?.trim() ||
@@ -35,6 +38,11 @@ export default function AccountSettingsView({ backHref }: AccountSettingsViewPro
     setBusy(true);
     try {
       await signOut();
+      // Reset to the marketing landing — teacher/student layouts also
+      // redirect when signed out, but replace("/") is the explicit home.
+      if (router.canDismiss()) {
+        router.dismissAll();
+      }
       router.replace("/");
     } catch (error) {
       Alert.alert("Sign out failed", error instanceof Error ? error.message : "Try again.");
@@ -50,6 +58,9 @@ export default function AccountSettingsView({ backHref }: AccountSettingsViewPro
         await graiderFetch("/api/me", { method: "DELETE" }),
       );
       await signOut();
+      if (router.canDismiss()) {
+        router.dismissAll();
+      }
       router.replace("/");
     } catch (error) {
       Alert.alert(
@@ -133,6 +144,18 @@ export default function AccountSettingsView({ backHref }: AccountSettingsViewPro
           >
             <Text className="text-sm font-bold text-white">Delete account</Text>
           </Pressable>
+        </View>
+
+        <View className="mt-10 items-center gap-1">
+          <Text className="text-xs text-ink-faint">Graider {versionLabel}</Text>
+          {versionIdentity.channel ? (
+            <Text className="text-[10px] text-ink-faint">
+              channel {versionIdentity.channel}
+              {versionIdentity.runtimeVersion
+                ? ` · runtime ${versionIdentity.runtimeVersion}`
+                : ""}
+            </Text>
+          ) : null}
         </View>
       </ScrollView>
     </View>
