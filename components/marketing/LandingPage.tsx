@@ -37,21 +37,27 @@ function GradedPaper() {
 const STEPS = [
   {
     n: "01",
-    title: "Snap the stack",
-    note: "any phone camera works",
-    desc: "Take photos of the whole pile of handwritten papers and drop them in. No scanner, no per-page fuss.",
+    title: "Drop in your test",
+    note: "answer bank included",
+    desc: "Upload the test and your answer key. Graider pulls questions and the bank automatically — no retyping the whole paper by hand.",
   },
   {
     n: "02",
-    title: "Names match themselves",
-    note: "you just confirm",
-    desc: "Graider reads each page, finds the student's name, and pairs it with your class roster. You confirm with one glance.",
+    title: "Grade against your rubric",
+    note: "your standards, not AI vibes",
+    desc: "Marks and feedback come from the key and rubric you provide. This is not an LLM freestyling opinions about student work.",
   },
   {
     n: "03",
-    title: "The red pen does the rest",
-    note: "marks + feedback",
-    desc: "Every answer is graded against your answer key, with per-question marks and feedback written like margin notes.",
+    title: "Snap the stack",
+    note: "camera or photo library",
+    desc: "Photograph the pile. Graider matches pages to students on your roster. You confirm once, then it grades the lot.",
+  },
+  {
+    n: "04",
+    title: "Hand it back your way",
+    note: "PDF, email, your call",
+    desc: "Toggle feedback on or off before you release. Share a marked PDF immediately, or email results with each student's address already filled in.",
   },
 ];
 
@@ -71,8 +77,9 @@ export default function LandingPage() {
             The stack grades itself.
           </Text>
           <Text className="mt-6 max-w-md text-center text-lg leading-relaxed text-ink-soft">
-            Photograph the pile of papers. Graider reads every page, matches it to a student, and marks it with
-            feedback — in one pass.
+            Upload your test and answer key, photograph the stack, and get marks against{" "}
+            <Text className="font-semibold text-ink">your</Text> rubric — then hand back a PDF or
+            email with feedback you control.
           </Text>
 
           <View className="mt-9 w-full items-center gap-4">
@@ -108,6 +115,12 @@ export default function LandingPage() {
           <Text className="text-center text-xs font-bold uppercase tracking-[0.22em] text-ink-faint">
             How it works
           </Text>
+          <Text className="mt-4 text-center font-display text-3xl font-semibold tracking-tight text-ink">
+            Your key. Your stack. Their marked papers — tonight.
+          </Text>
+          <Text className="mx-auto mt-4 max-w-xl text-center text-base leading-relaxed text-ink-soft">
+            Built for teachers who already know how they want work marked, and just need the Sunday pile gone.
+          </Text>
           <View className="mt-10 gap-10">
             {STEPS.map((step) => (
               <View key={step.n}>
@@ -130,7 +143,8 @@ export default function LandingPage() {
             Done before your coffee is.
           </Text>
           <Text className="mx-auto mt-4 max-w-md text-center text-base leading-relaxed text-paper/70">
-            Set up a class, photograph the stack, and hand back marked papers with real feedback — tomorrow morning.
+            Import your test, grade against your rubric, then toggle feedback and send the PDF — or email
+            each student with their address already filled in.
           </Text>
           <View className="mt-9 items-center">
             <Link href="/onboarding/hook" asChild>
