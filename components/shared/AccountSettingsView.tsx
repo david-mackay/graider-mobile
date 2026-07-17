@@ -2,6 +2,7 @@ import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Linking,
   Pressable,
   ScrollView,
   Text,
@@ -14,6 +15,9 @@ import { BrandMark, Wordmark } from "@/components/shared/Brand";
 import { formatAppVersionLabel, getNativeAppIdentity } from "@/lib/app-version";
 import { useGraiderFetch } from "@/lib/graider-fetch";
 import { handleJson } from "@/lib/dashboard-client";
+
+const MARKETING_BASE =
+  process.env.EXPO_PUBLIC_APP_URL?.replace(/\/$/, "") || "https://graider.vercel.app";
 
 type AccountSettingsViewProps = {
   backHref: "/(teacher)" | "/(student)";
@@ -128,6 +132,24 @@ export default function AccountSettingsView({ backHref }: AccountSettingsViewPro
             ) : (
               <Text className="text-sm font-bold text-ink">Sign out</Text>
             )}
+          </Pressable>
+        </View>
+
+        <View className="mt-6 rounded-2xl border border-line bg-paper p-4">
+          <Text className="text-xs font-bold uppercase tracking-wide text-ink-faint">Help</Text>
+          <Pressable
+            onPress={() => void Linking.openURL(`${MARKETING_BASE}/support`)}
+            disabled={busy}
+            className="mt-3 items-center rounded-full border border-line bg-cream px-5 py-3.5 active:opacity-80"
+          >
+            <Text className="text-sm font-bold text-ink">Support</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => void Linking.openURL(`${MARKETING_BASE}/privacy`)}
+            disabled={busy}
+            className="mt-2 items-center rounded-full border border-line bg-cream px-5 py-3.5 active:opacity-80"
+          >
+            <Text className="text-sm font-bold text-ink">Privacy Policy</Text>
           </Pressable>
         </View>
 
