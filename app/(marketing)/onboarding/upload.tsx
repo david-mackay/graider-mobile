@@ -7,6 +7,7 @@ import ImagePickerButton from "@/components/shared/ImagePickerButton";
 import { ClipboardType, X } from "lucide-react-native";
 import { getVault, setVault } from "@/lib/onboarding/vault";
 import { ONBOARDING_EVENTS, fireEvent } from "@/lib/onboarding/funnel-events";
+import { hasAnswerKey } from "@/lib/onboarding/types";
 import type { PickedImage } from "@/lib/picked-image";
 
 const MAX_BYTES = 8 * 1024 * 1024;
@@ -18,8 +19,8 @@ export default function OnboardingUploadPage() {
 
   useEffect(() => {
     fireEvent(ONBOARDING_EVENTS.PAPER_UPLOAD);
-    getVault().then((vault) => {
-      if (!vault?.answerKey) {
+    void getVault().then((vault) => {
+      if (!hasAnswerKey(vault)) {
         router.replace("/onboarding/answer-key");
       }
     });
@@ -76,11 +77,12 @@ export default function OnboardingUploadPage() {
         <View className="mb-6 h-16 w-16 items-center justify-center rounded-2xl bg-pen shadow-paper shadow-paper">
           <ClipboardType size={32} color="white" />
         </View>
-        <Text className="text-center text-3xl font-semibold tracking-tight text-ink">
-          Now snap a photo of your student's answer.
+        <Text className="text-center font-display text-3xl font-semibold tracking-tight text-ink">
+          Now snap one student&apos;s paper from the pile.
         </Text>
         <Text className="mt-4 text-center text-base leading-relaxed text-ink-soft">
-          We'll read the handwriting for you.
+          Same move as the full app — camera or photo library. We&apos;ll mark it against the key you
+          just set.
         </Text>
       </View>
 

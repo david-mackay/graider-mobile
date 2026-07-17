@@ -1,6 +1,7 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   ONBOARDING_VAULT_VERSION,
+  hasAnswerKey,
   type OnboardingStep,
   type OnboardingVault,
 } from "./types";
@@ -37,8 +38,7 @@ export async function getVault(): Promise<OnboardingVault | null> {
   if (
     !parsed ||
     typeof parsed !== "object" ||
-    (parsed as { schemaVersion?: unknown }).schemaVersion !==
-      ONBOARDING_VAULT_VERSION
+    (parsed as { schemaVersion?: unknown }).schemaVersion !== ONBOARDING_VAULT_VERSION
   ) {
     return null;
   }
@@ -74,11 +74,12 @@ export async function clearVault(): Promise<void> {
   try {
     await AsyncStorage.removeItem(VAULT_KEY);
   } catch {
+    // best-effort
   }
 }
 
 export function getResumeStep(vault: OnboardingVault | null): OnboardingStep {
-  if (!vault || !vault.answerKey) return "hook";
+  if (!vault || !hasAnswerKey(vault)) return "hook";
   if (!vault.studentPaper) return "upload";
   if (!vault.sampleGrade) return "result";
   if (!vault.completedAt) return "save";

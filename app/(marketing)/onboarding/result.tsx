@@ -6,7 +6,11 @@ import SocialProofCard from "@/components/marketing/SocialProofCard";
 import { Sparkles } from "lucide-react-native";
 import { getResumeStep, getVault, setVault } from "@/lib/onboarding/vault";
 import { ONBOARDING_EVENTS, fireEvent } from "@/lib/onboarding/funnel-events";
-import type { OnboardingSampleGrade } from "@/lib/types";
+import {
+  hasAnswerKey,
+  normalizeAnswerKeys,
+  type OnboardingSampleGrade,
+} from "@/lib/onboarding/types";
 
 type ResultState =
   | { kind: "loading" }
@@ -43,17 +47,18 @@ export default function OnboardingResultPage() {
         return;
       }
 
-      if (!vault.answerKey || !vault.studentPaper) {
-        console.warn('[result] Missing answerKey or studentPaper in vault, redirecting to upload');
+      if (!hasAnswerKey(vault) || !vault.studentPaper) {
+        console.warn("[result] Missing answer key or studentPaper in vault, redirecting to upload");
         router.replace("/onboarding/upload");
         return;
       }
 
-      const { answerKey, studentPaper } = vault;
+      const answerKeys = normalizeAnswerKeys(vault);
+      const { studentPaper } = vault;
 
       // Check for required fields
       if (!studentPaper.fileUri && !studentPaper.base64) {
-        console.warn('[result] studentPaper has no fileUri or base64');
+        console.warn("[result] studentPaper has no fileUri or base64");
         router.replace("/onboarding/upload");
         return;
       }
@@ -78,13 +83,14 @@ export default function OnboardingResultPage() {
         } as any);
       }
 
+      formData.append("answerKeys", JSON.stringify(answerKeys));
       formData.append(
         "answerKey",
         JSON.stringify({
-          prompt: answerKey.prompt,
-          correctAnswer: answerKey.correctAnswer,
-          marks: answerKey.marks,
-        })
+          prompt: answerKeys[0].prompt,
+          correctAnswer: answerKeys[0].correctAnswer,
+          marks: answerKeys[0].marks,
+        }),
       );
 
       const apiBase = process.env.EXPO_PUBLIC_APP_URL;
@@ -120,15 +126,16 @@ export default function OnboardingResultPage() {
           });
           return;
         }
-        const grade = {
+        const grade: OnboardingSampleGrade = {
           marksEarned: payload.marksEarned,
           maxMarks: payload.maxMarks,
           feedback: payload.feedback,
           ocrAnswerText: payload.ocrAnswerText,
+          questions: payload.questions,
         };
         await setVault({ sampleGrade: grade, completedAt: new Date().toISOString() });
         const isSoftFail = grade.marksEarned === 0 && grade.ocrAnswerText === "";
-        setState({ kind: isSoftFail ? "soft-fail" : "ready", grade: grade as any });
+        setState({ kind: isSoftFail ? "soft-fail" : "ready", grade });
       })
       .catch((err) => {
         console.error('[result] fetch error:', err);
@@ -175,6 +182,32 @@ export default function OnboardingResultPage() {
                   </Text>
                 ) : null}
               </View>
+
+              {state.grade.questions && state.grade.questions.length > 1 ? (
+                <View className="mt-5 gap-3 border-t border-line pt-4">
+                  <Text className="text-xs font-bold uppercase tracking-[0.18em] text-ink-faint">
+                    Per question
+                  </Text>
+                  {state.grade.questions.map((q, index) => (
+                    <View
+                      key={`${index}-${q.prompt.slice(0, 20)}`}
+                      className="rounded-xl border border-line bg-cream px-3 py-2.5"
+                    >
+                      <View className="flex-row items-start justify-between gap-3">
+                        <Text className="flex-1 text-sm font-semibold text-ink" numberOfLines={2}>
+                          Q{index + 1}. {q.prompt}
+                        </Text>
+                        <Text className="font-hand text-lg font-bold text-pen">
+                          {q.marksEarned}/{q.maxMarks}
+                        </Text>
+                      </View>
+                      {q.feedback ? (
+                        <Text className="mt-1 text-xs leading-relaxed text-ink-soft">{q.feedback}</Text>
+                      ) : null}
+                    </View>
+                  ))}
+                </View>
+              ) : null}
 
               {state.grade.ocrAnswerText ? (
                 <View className="mt-5 border-t border-line pt-4">
