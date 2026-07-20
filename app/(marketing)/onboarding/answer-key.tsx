@@ -89,7 +89,20 @@ export default function OnboardingAnswerKeyPage() {
         method: "POST",
         body: formData,
       });
-      const payload = (await res.json()) as ParseResponse;
+      // Server can error before returning JSON (timeout / body-too-large →
+      // HTML page). Read text first so we show a real message, not a parse error.
+      const raw = await res.text();
+      let payload: ParseResponse;
+      try {
+        payload = JSON.parse(raw) as ParseResponse;
+      } catch {
+        if (res.status === 413) {
+          throw new Error("PDF is too large. Keep it under 4 MB, or add the key manually.");
+        }
+        throw new Error(
+          "That upload didn't go through — the PDF may be too large or took too long. Try a smaller PDF or add the key manually.",
+        );
+      }
       if (!res.ok) {
         throw new Error(payload.error ?? "Could not read that PDF.");
       }
