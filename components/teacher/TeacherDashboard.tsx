@@ -14,6 +14,7 @@ import type {
   DashboardTest,
 } from "@/lib/dashboard-types";
 import StatusBanner from "@/components/shared/StatusBanner";
+import AppLoadingScreen from "@/components/shared/AppLoadingScreen";
 import ProfileSetup from "@/components/onboarding/ProfileSetup";
 import { TeacherTopBar, TeacherBottomNav, activeClassLabel } from "@/components/teacher/DashboardNav";
 import { getStoredClassId, pickDefaultClassId, setStoredClassId } from "@/lib/class-preference";
@@ -184,14 +185,7 @@ export default function TeacherDashboard() {
 
   // Loading / profile gates
   if (!isLoaded) {
-    return (
-      <View className="flex min-h-[calc(100vh-3.5rem)] items-center justify-center">
-        <View className="text-center">
-          <View className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-pen border-t-transparent" />
-          <Text className="text-sm font-medium text-ink-faint">Loading your workspace…</Text>
-        </View>
-      </View>
-    );
+    return <AppLoadingScreen />;
   }
 
   if (needsProfile) {

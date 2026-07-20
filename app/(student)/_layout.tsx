@@ -1,11 +1,12 @@
 import { Redirect, Stack } from "expo-router";
 import { useAuth } from "@clerk/clerk-expo";
+import AppLoadingScreen from "@/components/shared/AppLoadingScreen";
 
 export default function StudentLayout() {
   const { isLoaded, isSignedIn } = useAuth();
 
   if (!isLoaded) {
-    return null;
+    return <AppLoadingScreen />;
   }
 
   if (!isSignedIn) {

@@ -1,5 +1,6 @@
 import { Redirect, Stack, useSegments } from "expo-router";
 import { useAuth } from "@clerk/clerk-expo";
+import AppLoadingScreen from "@/components/shared/AppLoadingScreen";
 
 export default function MarketingLayout() {
   const { isLoaded, isSignedIn } = useAuth();
@@ -9,7 +10,7 @@ export default function MarketingLayout() {
   const inOnboarding = (segments as string[]).includes("onboarding");
 
   if (!isLoaded) {
-    return null;
+    return <AppLoadingScreen />;
   }
 
   if (isSignedIn && !inOnboarding) {

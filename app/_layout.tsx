@@ -24,13 +24,14 @@ configureReanimatedLogger({
   level: ReanimatedLogLevel.warn,
   strict: false,
 });
-import { ClerkProvider, ClerkLoaded } from '@clerk/clerk-expo';
+import { ClerkProvider, ClerkLoaded, ClerkLoading } from '@clerk/clerk-expo';
 import { tokenCache } from '../cache';
 
 import '../global.css';
 
 import { useColorScheme } from '@/components/useColorScheme';
 import { SubscriptionProvider } from '@/components/subscriptions/SubscriptionProvider';
+import AppLoadingScreen from '@/components/shared/AppLoadingScreen';
 import AppUpdatesProvider from '@/components/shared/AppUpdatesProvider';
 import PushNotificationsProvider from '@/components/shared/PushNotificationsProvider';
 import ServiceHealthProvider from '@/components/shared/ServiceHealthProvider';
@@ -80,11 +81,15 @@ export default function RootLayout() {
   }, [loaded]);
 
   if (!loaded) {
-    return null;
+    return <AppLoadingScreen />;
   }
 
   return (
     <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
+      {/* ClerkLoaded used to render nothing until ready → TestFlight looked blank. */}
+      <ClerkLoading>
+        <AppLoadingScreen />
+      </ClerkLoading>
       <ClerkLoaded>
         <AppUpdatesProvider>
           <ServiceHealthProvider>
