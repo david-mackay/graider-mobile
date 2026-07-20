@@ -1,3 +1,5 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
 export const ONBOARDING_EVENTS = {
   EMOTIONAL_HOOK: "onboarding_emotional_hook",
   CAPABILITIES: "onboarding_capabilities",
@@ -14,51 +16,40 @@ export type OnboardingEventName = (typeof ONBOARDING_EVENTS)[keyof typeof ONBOAR
 
 const SESSION_KEY = "graider:onboarding:fired-events:v1";
 
-function getFiredSet(): Set<string> {
-  if (typeof window === "undefined") return new Set();
-  try {
-    const raw = window.sessionStorage.getItem(SESSION_KEY);
-    if (!raw) return new Set();
-    const arr = JSON.parse(raw) as unknown;
-    return Array.isArray(arr) ? new Set(arr.filter((v) => typeof v === "string")) : new Set();
-  } catch {
-    return new Set();
-  }
-}
+/** In-memory dedupe for the current JS session (AsyncStorage is async). */
+const firedThisSession = new Set<string>();
 
-function persistFiredSet(set: Set<string>) {
-  if (typeof window === "undefined") return;
-  try {
-    window.sessionStorage.setItem(SESSION_KEY, JSON.stringify(Array.from(set)));
-  } catch {
-    // sessionStorage unavailable — fail silent.
-  }
+function analyticsUrl(): string | null {
+  const base = process.env.EXPO_PUBLIC_APP_URL?.replace(/\/$/, "");
+  if (!base) return null;
+  return `${base}/api/onboarding/analytics-stub`;
 }
 
 export function fireEvent(name: OnboardingEventName, payload?: Record<string, unknown>): void {
-  if (typeof window === "undefined") return;
-  const fired = getFiredSet();
-  if (fired.has(name)) return;
-  fired.add(name);
-  persistFiredSet(fired);
+  if (firedThisSession.has(name)) return;
+  firedThisSession.add(name);
 
-  // Ship to stub endpoint so the events are observable in dev.
-  // Use sendBeacon when available so the request survives navigation.
+  void AsyncStorage.getItem(SESSION_KEY)
+    .then(async (raw) => {
+      const prev = raw ? (JSON.parse(raw) as unknown) : [];
+      const list = Array.isArray(prev) ? prev.filter((v) => typeof v === "string") : [];
+      if (!list.includes(name)) {
+        list.push(name);
+        await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(list));
+      }
+    })
+    .catch(() => {
+      // Persistence is best-effort.
+    });
+
+  const url = analyticsUrl();
+  if (!url) return;
+
   const body = JSON.stringify({ name, payload, firedAt: new Date().toISOString() });
-  try {
-    if (typeof navigator !== "undefined" && typeof navigator.sendBeacon === "function") {
-      const blob = new Blob([body], { type: "application/json" });
-      navigator.sendBeacon("/api/onboarding/analytics-stub", blob);
-      return;
-    }
-  } catch {
-    // Fall through to fetch.
-  }
-  void fetch("/api/onboarding/analytics-stub", {
+  void fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body,
-    keepalive: true,
   }).catch(() => {
     // Analytics is best-effort; never break the user flow.
   });
