@@ -10,18 +10,29 @@ import type { AppRole } from "@/lib/types";
 type ProfileSetupProps = {
   initialName?: string;
   initialRole: AppRole;
+  initialInviteCode?: string;
   onComplete: (data: { full_name: string; role: AppRole }) => void | Promise<void>;
 };
 
-export default function ProfileSetup({ initialName = "", initialRole, onComplete }: ProfileSetupProps) {
+export default function ProfileSetup({
+  initialName = "",
+  initialRole,
+  initialInviteCode = "",
+  onComplete,
+}: ProfileSetupProps) {
   const graiderFetch = useGraiderFetch();
   const [name, setName] = useState(initialName);
   const [role, setRole] = useState<AppRole>(initialRole);
+  const [inviteCode, setInviteCode] = useState(initialInviteCode);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function submit() {
     if (!name.trim()) return;
+    if (role === "student" && !inviteCode.trim()) {
+      setError("Students need an invite code from their teacher to join.");
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -32,6 +43,15 @@ export default function ProfileSetup({ initialName = "", initialRole, onComplete
           body: JSON.stringify({ full_name: name }),
         }),
       );
+      if (role === "student") {
+        await handleJson(
+          await graiderFetch("/api/classes/join", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ inviteCode: inviteCode.trim() }),
+          }),
+        );
+      }
       await handleJson(
         await graiderFetch("/api/me/role", {
           method: "POST",
@@ -85,16 +105,30 @@ export default function ProfileSetup({ initialName = "", initialRole, onComplete
             <FormField label="I am a…">
               <View className="flex-row gap-3">
                 {roleOption("teacher", "Teacher", "Grade stacks of papers")}
-                {roleOption("student", "Student", "View released grades")}
+                {roleOption("student", "Student", "Take tests")}
               </View>
             </FormField>
+            {role === "student" ? (
+              <FormField label="Invite code" hint="From your teacher — enter it when you sign up.">
+                <TextInput
+                  className={`${inputClass} font-mono tracking-widest uppercase`}
+                  value={inviteCode}
+                  onChangeText={(text) => setInviteCode(text.toUpperCase())}
+                  placeholder="e.g. AB12CD"
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                />
+              </FormField>
+            ) : null}
             {error ? <Text className="text-xs font-bold text-pen-deep">{error}</Text> : null}
             <TouchableOpacity
-              disabled={busy || !name.trim()}
+              disabled={busy || !name.trim() || (role === "student" && !inviteCode.trim())}
               className={`${btnPrimary} w-full justify-center py-3`}
               onPress={submit}
             >
-              <Text className="font-bold text-white">{busy ? "Saving…" : "Continue"}</Text>
+              <Text className="font-bold text-white">
+                {busy ? "Saving…" : role === "student" ? "Join class" : "Continue"}
+              </Text>
             </TouchableOpacity>
           </View>
         </Card>

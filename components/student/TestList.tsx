@@ -19,7 +19,7 @@ function actionForRow(test: DashboardTest, attempt: DashboardAttempt | null) {
   if (attempt && attempt.status !== "draft") {
     return { kind: "waiting" as const, label: "Awaiting grade" };
   }
-  const available = test.available_now !== false && test.status !== "closed" && test.status !== "draft";
+  const available = test.available_now === true;
   if (attempt?.status === "draft") {
     return available
       ? { kind: "start" as const, label: "Resume" }
@@ -36,6 +36,27 @@ function actionForRow(test: DashboardTest, attempt: DashboardAttempt | null) {
     return { kind: "disabled" as const, label: "Not available" };
   }
   return { kind: "start" as const, label: "Start test" };
+}
+
+function timingHint(test: DashboardTest): string | null {
+  const parts: string[] = [];
+  if (test.duration_minutes && test.duration_minutes > 0) {
+    parts.push(`${test.duration_minutes} min limit`);
+  }
+  if (test.closes_at) {
+    const d = new Date(test.closes_at);
+    if (!Number.isNaN(d.getTime())) {
+      parts.push(
+        `Closes ${d.toLocaleString(undefined, {
+          month: "short",
+          day: "numeric",
+          hour: "numeric",
+          minute: "2-digit",
+        })}`,
+      );
+    }
+  }
+  return parts.length ? parts.join(" · ") : null;
 }
 
 export default function TestList({ rows, classNameById, onStart, onViewResult }: TestListProps) {
@@ -57,6 +78,7 @@ export default function TestList({ rows, classNameById, onStart, onViewResult }:
     <View className="gap-3">
       {rows.map(({ test, attempt }) => {
         const action = actionForRow(test, attempt);
+        const timing = timingHint(test);
         return (
           <Card key={test.id}>
             <View className="flex-row flex-wrap items-start justify-between gap-3">
@@ -76,6 +98,9 @@ export default function TestList({ rows, classNameById, onStart, onViewResult }:
                 <Text className="mt-0.5 text-xs text-ink-faint">
                   {classNameById.get(test.class_id) ?? ""}
                 </Text>
+                {timing && (action.kind === "start") ? (
+                  <Text className="mt-1 text-xs font-medium text-ink-soft">{timing}</Text>
+                ) : null}
                 {attempt?.status === "graded" ? (
                   <View className="mt-1.5 flex-row items-baseline gap-1">
                     <Text className="text-lg font-bold text-pen">{attempt.total_marks}</Text>

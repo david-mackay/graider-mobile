@@ -140,6 +140,12 @@ export default function StudentDashboard() {
   const [tests, setTests] = useState<DashboardTest[]>([]);
   const [attempts, setAttempts] = useState<DashboardAttempt[]>([]);
   const [selectedTest, setSelectedTest] = useState<TestDetail | null>(null);
+  const [activeAttempt, setActiveAttempt] = useState<{
+    attempt_id: string;
+    started_at: string | null;
+    deadline_at: string | null;
+    duration_minutes: number | null;
+  } | null>(null);
 
   const [testTakingAnswers, setTestTakingAnswers] = useState<Record<string, string>>({});
   const [selectedAttemptDetail, setSelectedAttemptDetail] = useState<GradedAttemptDetail | null>(null);
@@ -296,15 +302,19 @@ export default function StudentDashboard() {
       );
       setSelectedTest({
         ...payload.test,
-        // stash deadline on detail for timer if form supports it later
         available_now: true,
         duration_minutes: started.duration_minutes ?? payload.test.duration_minutes ?? null,
+      });
+      setActiveAttempt({
+        attempt_id: started.attempt_id,
+        started_at: started.started_at,
+        deadline_at: started.deadline_at,
+        duration_minutes: started.duration_minutes,
       });
       const initial: Record<string, string> = {};
       for (const q of payload.test.questions) initial[q.question_id] = "";
       setTestTakingAnswers(initial);
       setSelectedClassId(payload.test.class_id);
-      void started;
     } catch (error) {
       if (error instanceof Error) setStatus(error.message, "error");
       await loadDashboard();
@@ -322,7 +332,7 @@ export default function StudentDashboard() {
     }
   }
 
-  async function submitTest() {
+  async function submitTest(opts?: { timedOut?: boolean }) {
     if (!selectedTest) return;
     setIsBusy(true);
     const answers: AttemptAnswerPayload[] = selectedTest.questions.map((q) => ({
@@ -334,11 +344,16 @@ export default function StudentDashboard() {
         await graiderFetch("/api/submissions", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ testId: selectedTest.id, answers }),
+          body: JSON.stringify({
+            testId: selectedTest.id,
+            answers,
+            timed_out: opts?.timedOut === true,
+          }),
         }),
       );
-      setStatus("Test submitted successfully!");
+      setStatus(opts?.timedOut ? "Time is up — your test was submitted." : "Test submitted successfully!");
       setSelectedTest(null);
+      setActiveAttempt(null);
       await loadDashboard();
     } catch (error) {
       if (error instanceof Error) setStatus(error.message, "error");
@@ -397,8 +412,13 @@ export default function StudentDashboard() {
                 answers={testTakingAnswers}
                 onChangeAnswer={(qid, value) => setTestTakingAnswers((c) => ({ ...c, [qid]: value }))}
                 onSubmit={submitTest}
-                onClose={() => setSelectedTest(null)}
+                onClose={() => {
+                  setSelectedTest(null);
+                  setActiveAttempt(null);
+                }}
                 isBusy={isBusy}
+                deadlineAt={activeAttempt?.deadline_at ?? null}
+                durationMinutes={activeAttempt?.duration_minutes ?? null}
               />
             ) : null}
 

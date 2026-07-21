@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { Picker } from '@react-native-picker/picker';
 import { useState } from "react";
@@ -46,9 +46,14 @@ export default function InvitesPanel({
   const graiderFetch = useGraiderFetch();
   const [inviteExpiry, setInviteExpiry] = useState("0");
   const [singleUse, setSingleUse] = useState(true);
+  const [studentName, setStudentName] = useState("");
   const [copiedId, setCopiedId] = useState("");
 
   async function generateInvite(role: "student" | "teacher") {
+    if (role === "student" && !studentName.trim()) {
+      onStatus("Enter the student’s name for a student invite.", "error");
+      return;
+    }
     setBusy(true);
     try {
       const expiresInDays = Number(inviteExpiry) || undefined;
@@ -58,13 +63,15 @@ export default function InvitesPanel({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             invited_email: null,
+            invited_name: role === "student" ? studentName.trim() : null,
             role,
             expires_in_days: expiresInDays,
-            single_use: singleUse,
+            single_use: role === "student" ? true : singleUse,
           }),
         }),
       );
       onStatus(`New ${role} invite code generated.`);
+      if (role === "student") setStudentName("");
       await onChange();
     } catch (error) {
       if (error instanceof Error) onStatus(error.message, "error");
@@ -94,10 +101,9 @@ export default function InvitesPanel({
 
   async function copyCode(id: string, code: string) {
     try {
-      const base = process.env.EXPO_PUBLIC_APP_URL ?? "";
-      const text = base ? `${base}/s?join=${code}` : code;
-      await Clipboard.setStringAsync(text);
+      await Clipboard.setStringAsync(code);
       setCopiedId(id);
+      onStatus("Invite code copied. Students enter it when signing up.");
       setTimeout(() => setCopiedId((c) => (c === id ? "" : c)), 2000);
     } catch (error) {
       if (error instanceof Error) onStatus(error.message, "error");
@@ -106,6 +112,16 @@ export default function InvitesPanel({
 
   return (
     <View className="mt-3 space-y-4 border-t border-line pt-3">
+      <View className="gap-2">
+        <Text className="text-xs font-medium text-ink-soft">Student name (required for student invites)</Text>
+        <TextInput
+          value={studentName}
+          onChangeText={setStudentName}
+          placeholder="e.g. Maya Patel"
+          className="rounded-lg border border-line bg-paper px-3 py-2 text-sm text-ink"
+          placeholderTextColor="#9CA3AF"
+        />
+      </View>
       <View className="flex-row flex-wrap items-end gap-2">
         <View className="border border-line rounded-lg bg-paper overflow-hidden">
           <Text className="text-xs font-medium text-ink-soft px-2 pt-1">Expiry</Text>

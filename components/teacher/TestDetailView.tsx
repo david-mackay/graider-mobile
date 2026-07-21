@@ -53,7 +53,7 @@ export default function TestDetailView({
 
   const hasContext = Boolean(testId);
 
-  async function administerTest(action: "open_now" | "close_now") {
+  async function administerTest(action: "open_now") {
     if (!testId) return;
     setIsAdminBusy(true);
     try {
@@ -200,8 +200,8 @@ export default function TestDetailView({
                   ) : null}
                 </View>
               ) : null}
-              <View className="flex-row gap-2">
-                {test.status !== "open" ? (
+              {test.status !== "open" ? (
+                <View className="flex-row gap-2">
                   <Pressable
                     disabled={isAdminBusy}
                     onPress={() => void administerTest("open_now")}
@@ -209,16 +209,8 @@ export default function TestDetailView({
                   >
                     <Text className="text-sm font-medium text-white">Open now</Text>
                   </Pressable>
-                ) : (
-                  <Pressable
-                    disabled={isAdminBusy}
-                    onPress={() => void administerTest("close_now")}
-                    className={`${btnSecondary} flex-1 items-center`}
-                  >
-                    <Text className="text-sm font-medium text-pen-deep">Close now</Text>
-                  </Pressable>
-                )}
-              </View>
+                </View>
+              ) : null}
             </Card>
           ) : null}
 
