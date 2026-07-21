@@ -75,6 +75,9 @@ export type TestQuestion = {
   prompt: string;
   marks: number;
   sort_order: number;
+  question_type?: "open" | "mcq";
+  choices?: Array<{ key: string; text: string }> | null;
+  correct_answer?: string;
 };
 
 export type TestDetail = {
