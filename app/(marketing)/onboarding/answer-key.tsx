@@ -8,9 +8,11 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Pressable,
 } from "react-native";
 import { router } from "expo-router";
 import * as DocumentPicker from "expo-document-picker";
+import * as ImagePicker from "expo-image-picker";
 import OnboardingShell from "@/components/marketing/OnboardingShell";
 import { ClipboardList } from "lucide-react-native";
 import { getVault, setVault } from "@/lib/onboarding/vault";
@@ -31,16 +33,38 @@ type ParseResponse = {
   questions?: OnboardingAnswerKey[];
   truncated?: boolean;
   error?: string;
+  needsPhoto?: boolean;
 };
+
+function blankKey(): OnboardingAnswerKey {
+  return {
+    prompt: "",
+    correctAnswer: "",
+    marks: 1,
+    questionType: "open",
+    choices: null,
+  };
+}
+
+function normalizeIncoming(raw: OnboardingAnswerKey[]): OnboardingAnswerKey[] {
+  return raw.map((q) => ({
+    prompt: q.prompt ?? "",
+    correctAnswer: q.correctAnswer ?? "",
+    marks: Number.isInteger(q.marks) && q.marks > 0 ? q.marks : 1,
+    questionType: q.questionType === "mcq" ? "mcq" : "open",
+    choices: Array.isArray(q.choices) ? q.choices : null,
+  }));
+}
 
 export default function OnboardingAnswerKeyPage() {
   const [mode, setMode] = useState<"choose" | "manual" | "preview">("choose");
   const [keys, setKeys] = useState<OnboardingAnswerKey[]>([]);
-  const [pdfName, setPdfName] = useState<string | null>(null);
+  const [uploadName, setUploadName] = useState<string | null>(null);
   const [truncated, setTruncated] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [correctAnswer, setCorrectAnswer] = useState("");
   const [marks, setMarks] = useState("5");
+  const [manualType, setManualType] = useState<"open" | "mcq">("open");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -49,20 +73,73 @@ export default function OnboardingAnswerKeyPage() {
     void getVault().then((vault) => {
       const existing = normalizeAnswerKeys(vault);
       if (existing.length > 0) {
-        setKeys(existing);
+        setKeys(normalizeIncoming(existing));
         setMode(vault?.answerKeySource === "manual" && existing.length === 1 ? "manual" : "preview");
         if (existing.length === 1) {
           setPrompt(existing[0].prompt);
           setCorrectAnswer(existing[0].correctAnswer);
           setMarks(existing[0].marks.toString());
+          setManualType(existing[0].questionType === "mcq" ? "mcq" : "open");
         }
       }
     });
   }, []);
 
   async function continueWithKeys(nextKeys: OnboardingAnswerKey[], source: "pdf" | "manual") {
-    await setVault(answerKeyVaultUpdate(nextKeys, source));
+    const cleaned = nextKeys
+      .map((q) => ({
+        ...q,
+        prompt: q.prompt.trim(),
+        correctAnswer: q.correctAnswer.trim(),
+        marks: Number.isInteger(q.marks) && q.marks > 0 ? q.marks : 1,
+        questionType: q.questionType === "mcq" ? ("mcq" as const) : ("open" as const),
+        choices: q.questionType === "mcq" ? q.choices ?? null : null,
+      }))
+      .filter((q) => q.prompt && q.correctAnswer);
+    if (cleaned.length === 0) {
+      setError("Add at least one question with a prompt and correct answer.");
+      return;
+    }
+    await setVault(answerKeyVaultUpdate(cleaned, source));
     router.push("/onboarding/upload");
+  }
+
+  async function handleParseResponse(res: Response) {
+    const raw = await res.text();
+    let payload: ParseResponse;
+    try {
+      payload = JSON.parse(raw) as ParseResponse;
+    } catch {
+      if (res.status === 413) {
+        throw new Error("File is too large. Keep it under 4 MB, or add the key manually.");
+      }
+      throw new Error(
+        "That upload didn't go through — the file may be too large or took too long. Try again or add the key manually.",
+      );
+    }
+    const questions = normalizeIncoming(payload.questions ?? []);
+    if (!res.ok) {
+      if (payload.needsPhoto || questions.length === 0) {
+        setKeys([blankKey()]);
+        setMode("preview");
+        setError(
+          payload.error ??
+            "We couldn't prefill from that file. Tweak the review below, or photograph the key.",
+        );
+        return;
+      }
+      throw new Error(payload.error ?? "Could not read that answer key.");
+    }
+    if (questions.length === 0) {
+      setKeys([blankKey()]);
+      setMode("preview");
+      setError("Nothing found — add questions in the review below.");
+      return;
+    }
+    setKeys(questions);
+    setTruncated(Boolean(payload.truncated));
+    setMode("preview");
+    setError(null);
   }
 
   async function onPickPdf() {
@@ -76,7 +153,7 @@ export default function OnboardingAnswerKeyPage() {
       if (result.canceled || !result.assets?.[0]) return;
       const asset = result.assets[0];
       setBusy(true);
-      setPdfName(asset.name);
+      setUploadName(asset.name);
 
       const formData = new FormData();
       appendDocumentToFormData(formData, "pdf", {
@@ -89,36 +166,67 @@ export default function OnboardingAnswerKeyPage() {
         method: "POST",
         body: formData,
       });
-      // Server can error before returning JSON (timeout / body-too-large →
-      // HTML page). Read text first so we show a real message, not a parse error.
-      const raw = await res.text();
-      let payload: ParseResponse;
-      try {
-        payload = JSON.parse(raw) as ParseResponse;
-      } catch {
-        if (res.status === 413) {
-          throw new Error("PDF is too large. Keep it under 4 MB, or add the key manually.");
-        }
-        throw new Error(
-          "That upload didn't go through — the PDF may be too large or took too long. Try a smaller PDF or add the key manually.",
-        );
-      }
-      if (!res.ok) {
-        throw new Error(payload.error ?? "Could not read that PDF.");
-      }
-      const questions = payload.questions ?? [];
-      if (questions.length === 0) {
-        throw new Error("No questions found in that PDF.");
-      }
-      setKeys(questions);
-      setTruncated(Boolean(payload.truncated));
-      setMode("preview");
+      await handleParseResponse(res);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not read that PDF.");
-      setPdfName(null);
+      setUploadName(null);
     } finally {
       setBusy(false);
     }
+  }
+
+  async function onPickPhotos() {
+    setError(null);
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        setError("Photo library access is needed to upload a circled answer key.");
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsMultipleSelection: true,
+        quality: 0.85,
+      });
+      if (result.canceled || !result.assets?.length) return;
+      setBusy(true);
+      setUploadName(
+        result.assets.length === 1
+          ? result.assets[0].fileName ?? "answer-key.jpg"
+          : `${result.assets.length} photos`,
+      );
+
+      const formData = new FormData();
+      result.assets.forEach((asset, index) => {
+        appendDocumentToFormData(formData, "image", {
+          uri: asset.uri,
+          name: asset.fileName || `key-${index + 1}.jpg`,
+          mimeType: asset.mimeType || "image/jpeg",
+        });
+      });
+
+      const res = await fetch(resolveGraiderApiUrl("/api/onboarding/parse-answer-key"), {
+        method: "POST",
+        body: formData,
+      });
+      await handleParseResponse(res);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not read those photos.");
+      setUploadName(null);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function updateKey(index: number, patch: Partial<OnboardingAnswerKey>) {
+    setKeys((prev) => prev.map((key, i) => (i === index ? { ...key, ...patch } : key)));
+  }
+
+  function removeKey(index: number) {
+    setKeys((prev) => {
+      const next = prev.filter((_, i) => i !== index);
+      return next.length > 0 ? next : [blankKey()];
+    });
   }
 
   async function onManualSubmit() {
@@ -141,7 +249,15 @@ export default function OnboardingAnswerKeyPage() {
     }
 
     await continueWithKeys(
-      [{ prompt: trimmedPrompt, correctAnswer: trimmedAnswer, marks: marksNum }],
+      [
+        {
+          prompt: trimmedPrompt,
+          correctAnswer: trimmedAnswer,
+          marks: marksNum,
+          questionType: manualType,
+          choices: null,
+        },
+      ],
       "manual",
     );
   }
@@ -164,8 +280,7 @@ export default function OnboardingAnswerKeyPage() {
               Bring the answer key you already trust.
             </Text>
             <Text className="mt-4 text-center text-base leading-relaxed text-ink-soft">
-              Upload the full PDF — the same way you would in the app — or type one question if you
-              just want a quick taste.
+              {"Upload a PDF or photo — including MCQ letter keys or circled answers. We'll prefill what we can; you tweak the review before grading."}
             </Text>
           </View>
 
@@ -176,11 +291,10 @@ export default function OnboardingAnswerKeyPage() {
                   Recommended
                 </Text>
                 <Text className="mt-2 font-display text-xl font-semibold text-ink">
-                  Upload your answer key PDF
+                  Upload your answer key
                 </Text>
                 <Text className="mt-2 text-sm leading-relaxed text-ink-soft">
-                  Drop in the key for this test. Graider extracts prompts, model answers, and marks —
-                  then you photograph student papers against your rubric.
+                  PDF for typed keys, or a photo if answers are circled / the PDF is a scan.
                 </Text>
                 <TouchableOpacity
                   onPress={() => void onPickPdf()}
@@ -191,16 +305,29 @@ export default function OnboardingAnswerKeyPage() {
                     <ActivityIndicator color="#fff" />
                   ) : (
                     <Text className="text-base font-semibold text-white">
-                      {pdfName ? `Replace · ${pdfName}` : "Choose PDF answer key"}
+                      {uploadName?.endsWith(".pdf") ? `Replace · ${uploadName}` : "Choose PDF"}
                     </Text>
                   )}
                 </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => void onPickPhotos()}
+                  disabled={busy}
+                  className="mt-2 items-center justify-center rounded-full border border-line bg-cream px-8 py-3.5 active:bg-cream-deep"
+                >
+                  <Text className="text-base font-semibold text-pen-deep">Upload photo(s)</Text>
+                </TouchableOpacity>
+                <Text className="mt-2 text-xs text-ink-faint">
+                  {"Circled answers? Photograph the marked key — circles aren't in PDF text."}
+                </Text>
               </View>
 
-              {mode === "preview" && keys.length > 0 ? (
+              {mode === "preview" ? (
                 <View className="rounded-2xl border border-line bg-cream/60 p-4">
                   <Text className="text-sm font-semibold text-ink">
-                    Found {keys.length} question{keys.length === 1 ? "" : "s"} · {totalMarks} marks
+                    Review {keys.length} question{keys.length === 1 ? "" : "s"} · {totalMarks} marks
+                  </Text>
+                  <Text className="mt-1 text-xs text-ink-faint">
+                    Prefill is a draft — fix letters, stems, and types before continuing.
                   </Text>
                   {truncated ? (
                     <Text className="mt-1 text-xs text-ink-faint">
@@ -210,24 +337,76 @@ export default function OnboardingAnswerKeyPage() {
                   <View className="mt-3 gap-3">
                     {keys.map((key, index) => (
                       <View
-                        key={`${index}-${key.prompt.slice(0, 24)}`}
-                        className="rounded-xl border border-line bg-paper px-3 py-2.5"
+                        key={`row-${index}`}
+                        className="gap-2 rounded-xl border border-line bg-paper px-3 py-2.5"
                       >
-                        <Text className="text-xs font-bold uppercase tracking-wide text-ink-faint">
-                          Q{index + 1} · {key.marks} mark{key.marks === 1 ? "" : "s"}
-                        </Text>
-                        <Text className="mt-1 text-sm font-semibold text-ink" numberOfLines={2}>
-                          {key.prompt}
-                        </Text>
-                        <Text className="mt-1 text-xs leading-relaxed text-ink-soft" numberOfLines={2}>
-                          Key: {key.correctAnswer}
-                        </Text>
+                        <View className="flex-row flex-wrap items-center gap-2">
+                          <Text className="text-xs font-bold uppercase tracking-wide text-ink-faint">
+                            Q{index + 1}
+                          </Text>
+                          <Pressable
+                            onPress={() =>
+                              updateKey(index, {
+                                questionType: key.questionType === "mcq" ? "open" : "mcq",
+                                marks: key.questionType === "mcq" ? key.marks : 1,
+                              })
+                            }
+                            className="rounded-full border border-line bg-cream px-2.5 py-1"
+                          >
+                            <Text className="text-xs font-bold text-ink-soft">
+                              {key.questionType === "mcq" ? "MCQ" : "Open"}
+                            </Text>
+                          </Pressable>
+                          <TextInput
+                            value={String(key.marks)}
+                            onChangeText={(text) => {
+                              const next = parseInt(text, 10);
+                              updateKey(index, { marks: Number.isFinite(next) && next > 0 ? next : 1 });
+                            }}
+                            keyboardType="numeric"
+                            className="w-14 rounded-xl border border-line bg-cream px-2 py-1 text-xs text-ink"
+                          />
+                          <Pressable onPress={() => removeKey(index)} className="ml-auto">
+                            <Text className="text-xs font-bold text-ink-faint">Remove</Text>
+                          </Pressable>
+                        </View>
+                        <TextInput
+                          value={key.prompt}
+                          onChangeText={(text) => updateKey(index, { prompt: text })}
+                          placeholder="Question prompt"
+                          placeholderTextColor="#a3927b"
+                          className="rounded-xl border border-line bg-cream px-3 py-2 text-sm text-ink"
+                          multiline
+                        />
+                        <TextInput
+                          value={key.correctAnswer}
+                          onChangeText={(text) => updateKey(index, { correctAnswer: text })}
+                          placeholder={
+                            key.questionType === "mcq" ? "Correct letter (e.g. B)" : "Correct answer"
+                          }
+                          placeholderTextColor="#a3927b"
+                          className="rounded-xl border border-line bg-cream px-3 py-2 text-sm text-ink"
+                        />
+                        {key.questionType === "mcq" && key.choices && key.choices.length > 0
+                          ? key.choices.map((c) => (
+                              <Text key={c.key} className="text-xs text-ink-soft">
+                                <Text className="font-semibold text-ink">{c.key}. </Text>
+                                {c.text}
+                              </Text>
+                            ))
+                          : null}
                       </View>
                     ))}
                   </View>
                   <TouchableOpacity
+                    onPress={() => setKeys((prev) => [...prev, blankKey()])}
+                    className="mt-3 items-center py-1"
+                  >
+                    <Text className="text-sm font-bold text-ink-soft underline">Add question</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
                     onPress={() => void continueWithKeys(keys, "pdf")}
-                    className="mt-4 items-center justify-center rounded-full bg-pen px-8 py-4 shadow-paper active:bg-pen-deep"
+                    className="mt-3 items-center justify-center rounded-full bg-pen px-8 py-4 shadow-paper active:bg-pen-deep"
                   >
                     <Text className="text-base font-semibold text-white">
                       Grade a student paper with this key
@@ -244,7 +423,7 @@ export default function OnboardingAnswerKeyPage() {
                 className="items-center py-2"
               >
                 <Text className="text-sm font-bold text-ink-soft underline decoration-line">
-                  Skip PDF — type one question quickly
+                  Skip upload — type one question quickly
                 </Text>
               </TouchableOpacity>
             </View>
@@ -254,9 +433,31 @@ export default function OnboardingAnswerKeyPage() {
             <View className="gap-4">
               <View className="rounded-xl border border-line bg-cream/60 px-3.5 py-2.5">
                 <Text className="text-sm leading-relaxed text-ink-soft">
-                  Quick route: one question is enough for the demo. You can import a full PDF after
-                  you sign up.
+                  Quick route: one question is enough for the demo.
                 </Text>
+              </View>
+
+              <View className="flex-row gap-2">
+                {(["open", "mcq"] as const).map((type) => (
+                  <Pressable
+                    key={type}
+                    onPress={() => {
+                      setManualType(type);
+                      if (type === "mcq") setMarks("1");
+                    }}
+                    className={`rounded-full px-4 py-2 ${
+                      manualType === type ? "bg-pen" : "border border-line bg-cream"
+                    }`}
+                  >
+                    <Text
+                      className={`text-sm font-bold ${
+                        manualType === type ? "text-white" : "text-ink-soft"
+                      }`}
+                    >
+                      {type === "mcq" ? "MCQ" : "Open"}
+                    </Text>
+                  </Pressable>
+                ))}
               </View>
 
               <View>
@@ -274,15 +475,19 @@ export default function OnboardingAnswerKeyPage() {
               </View>
 
               <View>
-                <Text className="mb-1 text-sm font-semibold text-ink">Correct answer</Text>
+                <Text className="mb-1 text-sm font-semibold text-ink">
+                  {manualType === "mcq" ? "Correct letter" : "Correct answer"}
+                </Text>
                 <TextInput
                   value={correctAnswer}
                   onChangeText={setCorrectAnswer}
-                  placeholder={DEFAULT_CORRECT_ANSWER}
+                  placeholder={manualType === "mcq" ? "B" : DEFAULT_CORRECT_ANSWER}
                   placeholderTextColor="#a3927b"
-                  className="h-28 rounded-2xl border border-line bg-paper px-4 py-3 text-base text-ink"
-                  multiline
-                  numberOfLines={4}
+                  className={`${
+                    manualType === "mcq" ? "" : "h-28 "
+                  }rounded-2xl border border-line bg-paper px-4 py-3 text-base text-ink`}
+                  multiline={manualType !== "mcq"}
+                  numberOfLines={manualType === "mcq" ? 1 : 4}
                   textAlignVertical="top"
                 />
               </View>
@@ -310,7 +515,7 @@ export default function OnboardingAnswerKeyPage() {
                 }}
                 className="items-center py-2"
               >
-                <Text className="text-sm font-bold text-ink-soft">Back to PDF upload</Text>
+                <Text className="text-sm font-bold text-ink-soft">Back to upload</Text>
               </TouchableOpacity>
             </View>
           ) : null}

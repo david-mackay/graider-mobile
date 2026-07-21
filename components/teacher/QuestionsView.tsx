@@ -60,12 +60,14 @@ export default function QuestionsView({
   const [answer, setAnswer] = useState("");
   const [topic, setTopic] = useState("");
   const [marks, setMarks] = useState("2");
+  const [questionType, setQuestionType] = useState<"open" | "mcq">("open");
 
   const [editId, setEditId] = useState<string | null>(null);
   const [editPrompt, setEditPrompt] = useState("");
   const [editAnswer, setEditAnswer] = useState("");
   const [editTopic, setEditTopic] = useState("");
   const [editMarks, setEditMarks] = useState("2");
+  const [editQuestionType, setEditQuestionType] = useState<"open" | "mcq">("open");
 
   const grouped: GroupedQuestions[] = (() => {
     const map = new Map<string, DashboardQuestion[]>();
@@ -86,6 +88,7 @@ export default function QuestionsView({
     setAnswer("");
     setTopic("");
     setMarks("2");
+    setQuestionType("open");
     setAddModalOpen(true);
   }
 
@@ -95,6 +98,7 @@ export default function QuestionsView({
     setEditAnswer(q.correct_answer);
     setEditTopic(q.topic ?? "");
     setEditMarks(String(q.marks));
+    setEditQuestionType(q.question_type === "mcq" ? "mcq" : "open");
     setEditModalOpen(true);
   }
 
@@ -120,6 +124,7 @@ export default function QuestionsView({
             correct_answer: answer,
             marks: Number(marks),
             topic,
+            question_type: questionType,
           }),
         }),
       );
@@ -147,6 +152,7 @@ export default function QuestionsView({
             correct_answer: editAnswer,
             marks: Number(editMarks),
             topic: editTopic,
+            question_type: editQuestionType,
           }),
         }),
       );
@@ -271,10 +277,12 @@ export default function QuestionsView({
                           <View className="min-w-0 flex-1">
                             <Text className="text-sm font-medium leading-snug text-ink">{q.prompt}</Text>
                             <Text className="mt-1.5 text-xs text-ink-faint" numberOfLines={2}>
-                              Answer key: <Text className="italic">{q.correct_answer}</Text>
+                              {q.question_type === "mcq" ? "Correct letter: " : "Answer key: "}
+                              <Text className="italic">{q.correct_answer}</Text>
                             </Text>
                           </View>
                           <View className="flex-row items-center gap-2">
+                            {q.question_type === "mcq" ? <Badge variant="gray">MCQ</Badge> : null}
                             <MarksPill marks={q.marks} />
                             <IconButton
                               icon={Pencil}
@@ -324,6 +332,28 @@ export default function QuestionsView({
               disabled={isBusy}
             />
           ) : null}
+          <View className="flex-row gap-2">
+            {(["open", "mcq"] as const).map((type) => (
+              <Pressable
+                key={type}
+                onPress={() => {
+                  setQuestionType(type);
+                  if (type === "mcq") setMarks("1");
+                }}
+                className={`rounded-full px-4 py-2 ${
+                  questionType === type ? "bg-pen" : "border border-line bg-cream"
+                }`}
+              >
+                <Text
+                  className={`text-sm font-bold ${
+                    questionType === type ? "text-white" : "text-ink-soft"
+                  }`}
+                >
+                  {type === "mcq" ? "MCQ" : "Open"}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
           <View className="flex-row gap-3">
             <View className="flex-1">
               <FormField label="Topic">
@@ -346,13 +376,20 @@ export default function QuestionsView({
               textAlignVertical="top"
             />
           </FormField>
-          <FormField label="Answer key" hint="Model answer for AI grading — students won't see this.">
+          <FormField
+            label={questionType === "mcq" ? "Correct letter" : "Answer key"}
+            hint={
+              questionType === "mcq"
+                ? "Letter only (A–E). Graded by exact match."
+                : "Model answer for AI grading — students won't see this."
+            }
+          >
             <GraiderTextInput
-              multiline
-              className="min-h-[80px]"
+              multiline={questionType !== "mcq"}
+              className={questionType === "mcq" ? undefined : "min-h-[80px]"}
               value={answer}
               onChangeText={setAnswer}
-              placeholder="Be specific for better grading."
+              placeholder={questionType === "mcq" ? "B" : "Be specific for better grading."}
               textAlignVertical="top"
             />
           </FormField>
@@ -369,6 +406,25 @@ export default function QuestionsView({
         primaryLoading={isBusy}
       >
         <View className="gap-4">
+          <View className="flex-row gap-2">
+            {(["open", "mcq"] as const).map((type) => (
+              <Pressable
+                key={type}
+                onPress={() => setEditQuestionType(type)}
+                className={`rounded-full px-4 py-2 ${
+                  editQuestionType === type ? "bg-pen" : "border border-line bg-cream"
+                }`}
+              >
+                <Text
+                  className={`text-sm font-bold ${
+                    editQuestionType === type ? "text-white" : "text-ink-soft"
+                  }`}
+                >
+                  {type === "mcq" ? "MCQ" : "Open"}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
           <View className="flex-row gap-3">
             <View className="flex-1">
               <FormField label="Topic">
@@ -390,10 +446,10 @@ export default function QuestionsView({
               textAlignVertical="top"
             />
           </FormField>
-          <FormField label="Answer key">
+          <FormField label={editQuestionType === "mcq" ? "Correct letter" : "Answer key"}>
             <GraiderTextInput
-              multiline
-              className="min-h-[60px]"
+              multiline={editQuestionType !== "mcq"}
+              className={editQuestionType === "mcq" ? undefined : "min-h-[60px]"}
               value={editAnswer}
               onChangeText={setEditAnswer}
               textAlignVertical="top"

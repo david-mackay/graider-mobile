@@ -47,6 +47,8 @@ export type QuestionBankQuestion = {
   correct_answer: string;
   marks: number;
   topic?: string | null;
+  question_type?: "open" | "mcq";
+  choices?: Array<{ key: string; text: string }> | null;
   created_at?: string | null;
   updated_at?: string | null;
 };
