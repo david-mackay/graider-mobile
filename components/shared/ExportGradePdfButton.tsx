@@ -153,7 +153,7 @@ export default function ExportGradePdfButton({
                     disabled={busy}
                   />
                   <SettingSwitchRow
-                    label="Include AI feedback"
+                    label="Include feedback"
                     value={includeFeedback}
                     onValueChange={setIncludeFeedback}
                     disabled={busy}
@@ -192,9 +192,6 @@ export default function ExportGradePdfButton({
 
                 <ScrollView className="mt-4 max-h-96" contentContainerStyle={{ paddingBottom: 8 }}>
                   <Card className="border-line bg-cream/30">
-                    <Text className="text-xs font-semibold uppercase tracking-wide text-ink-faint">
-                      Graider
-                    </Text>
                     <Text className="mt-1 text-lg font-semibold text-ink">
                       {previewAttempt?.test_title ?? "Graded paper"}
                     </Text>

@@ -16,7 +16,7 @@ function escapeHtml(value: string): string {
     .replace(/"/g, "&quot;");
 }
 
-function buildGradeHtml(attempt: GradedAttemptDetail, options: GradePdfOptions): string {
+export function buildGradeHtml(attempt: GradedAttemptDetail, options: GradePdfOptions): string {
   const studentLabel = escapeHtml(
     options.studentName?.trim() ||
       attempt.student_name?.trim() ||
@@ -67,16 +67,9 @@ function buildGradeHtml(attempt: GradedAttemptDetail, options: GradePdfOptions):
         padding: 28px;
         line-height: 1.45;
       }
-      .brand {
-        color: #be3a2e;
-        font-size: 12px;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-        font-weight: 700;
-      }
       h1 {
         font-size: 24px;
-        margin: 8px 0 4px;
+        margin: 0 0 4px;
       }
       .meta {
         color: #6f6151;
@@ -132,20 +125,13 @@ function buildGradeHtml(attempt: GradedAttemptDetail, options: GradePdfOptions):
         font-size: 13px;
         color: #4a7c59;
       }
-      footer {
-        margin-top: 24px;
-        font-size: 11px;
-        color: #a3927b;
-      }
     </style>
   </head>
   <body>
-    <div class="brand">Graider</div>
     <h1>${testTitle}</h1>
     <p class="meta">${studentLabel}</p>
     ${gradeBlock}
     ${questions}
-    <footer>Graded with Graider · for teachers who grade by hand</footer>
   </body>
 </html>`;
 }
