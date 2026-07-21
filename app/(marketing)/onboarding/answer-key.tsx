@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -7,8 +7,9 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  ActivityIndicator,
   Pressable,
+  Animated,
+  Easing,
 } from "react-native";
 import { router } from "expo-router";
 import * as DocumentPicker from "expo-document-picker";
@@ -44,6 +45,44 @@ function blankKey(): OnboardingAnswerKey {
     questionType: "open",
     choices: null,
   };
+}
+
+function ReadingProgressBar() {
+  const translateX = useRef(new Animated.Value(-1)).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.timing(translateX, {
+        toValue: 1,
+        duration: 1150,
+        easing: Easing.inOut(Easing.ease),
+        useNativeDriver: true,
+      }),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [translateX]);
+
+  return (
+    <View className="mt-4 gap-2">
+      <Text className="text-xs font-semibold text-ink-soft">Reading your answer key…</Text>
+      <View className="h-1.5 overflow-hidden rounded-full bg-line">
+        <Animated.View
+          className="h-full w-2/5 rounded-full bg-pen"
+          style={{
+            transform: [
+              {
+                translateX: translateX.interpolate({
+                  inputRange: [-1, 1],
+                  outputRange: [-80, 220],
+                }),
+              },
+            ],
+          }}
+        />
+      </View>
+    </View>
+  );
 }
 
 function normalizeIncoming(raw: OnboardingAnswerKey[]): OnboardingAnswerKey[] {
@@ -300,25 +339,33 @@ export default function OnboardingAnswerKeyPage() {
                   onPress={() => void onPickPdf()}
                   disabled={busy}
                   className="mt-4 items-center justify-center rounded-full bg-pen px-8 py-4 shadow-paper active:bg-pen-deep"
+                  style={busy ? { opacity: 0.6 } : undefined}
                 >
-                  {busy ? (
-                    <ActivityIndicator color="#fff" />
-                  ) : (
-                    <Text className="text-base font-semibold text-white">
-                      {uploadName?.endsWith(".pdf") ? `Replace · ${uploadName}` : "Choose PDF"}
-                    </Text>
-                  )}
+                  <Text className="text-base font-semibold text-white">
+                    {busy
+                      ? "Reading…"
+                      : uploadName?.endsWith(".pdf")
+                        ? `Replace · ${uploadName}`
+                        : "Choose PDF"}
+                  </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={() => void onPickPhotos()}
                   disabled={busy}
                   className="mt-2 items-center justify-center rounded-full border border-line bg-cream px-8 py-3.5 active:bg-cream-deep"
+                  style={busy ? { opacity: 0.6 } : undefined}
                 >
-                  <Text className="text-base font-semibold text-pen-deep">Upload photo(s)</Text>
+                  <Text className="text-base font-semibold text-pen-deep">
+                    {busy ? "Reading…" : "Upload photo(s)"}
+                  </Text>
                 </TouchableOpacity>
-                <Text className="mt-2 text-xs text-ink-faint">
-                  {"Circled answers? Photograph the marked key — circles aren't in PDF text."}
-                </Text>
+                {busy ? (
+                  <ReadingProgressBar />
+                ) : (
+                  <Text className="mt-2 text-xs text-ink-faint">
+                    {"Circled answers? Photograph the marked key — circles aren't in PDF text."}
+                  </Text>
+                )}
               </View>
 
               {mode === "preview" ? (

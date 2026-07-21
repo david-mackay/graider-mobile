@@ -32,7 +32,7 @@ const ENDPOINTS: Record<ContentImportKind, string> = {
 const LABELS: Record<ContentImportKind, { title: string; hint: string; success: string }> = {
   question_bank: {
     title: "Import from PDF",
-    hint: "Upload a question bank PDF — we'll extract questions and answer keys.",
+    hint: "Upload a question bank or answer-key PDF — including MCQ letter keys. We'll extract questions.",
     success: "Question bank imported.",
   },
   test: {
