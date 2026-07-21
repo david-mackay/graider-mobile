@@ -60,6 +60,12 @@ export type TestSummary = {
   teacher_id: string;
   grades_released: boolean;
   show_ai_feedback: boolean;
+  status?: "draft" | "scheduled" | "open" | "closed" | null;
+  opens_at?: string | null;
+  closes_at?: string | null;
+  duration_minutes?: number | null;
+  allow_late_submit?: boolean | null;
+  available_now?: boolean | null;
   created_at?: string | null;
   updated_at?: string | null;
 };
@@ -77,6 +83,12 @@ export type TestDetail = {
   class_id: string;
   teacher_id: string;
   questions: TestQuestion[];
+  status?: "draft" | "scheduled" | "open" | "closed" | null;
+  opens_at?: string | null;
+  closes_at?: string | null;
+  duration_minutes?: number | null;
+  allow_late_submit?: boolean | null;
+  available_now?: boolean | null;
   created_at?: string | null;
   updated_at?: string | null;
 };

@@ -1,13 +1,31 @@
 import { useEffect, useMemo, useState } from "react";
 import { View, Text, Pressable, ScrollView } from "react-native";
 import { useRouter } from "expo-router";
-import { Badge, Card, SectionHeader, btnSecondary } from "@/components/shared/ui";
+import { Badge, Card, SectionHeader, btnPrimary, btnSecondary } from "@/components/shared/ui";
 import AttemptBreakdownCard from "@/components/teacher/AttemptBreakdownCard";
 import { handleJson } from "@/lib/dashboard-client";
 import { useGraiderFetch } from "@/lib/graider-fetch";
 import type { ClassMember, DashboardAttempt, GradedAttemptDetail } from "@/lib/dashboard-types";
 import type { TestDetail } from "@/lib/types";
 import { formatStudentDisplayName } from "@/lib/roster-display";
+
+function statusBadgeVariant(status?: string | null): "green" | "yellow" | "gray" | "blue" {
+  switch (status) {
+    case "open": return "green";
+    case "scheduled": return "yellow";
+    case "closed": return "gray";
+    default: return "gray";
+  }
+}
+
+function formatScheduleDate(iso: string): string {
+  return new Date(iso).toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
 
 type TestDetailViewProps = {
   testId?: string;
@@ -31,7 +49,28 @@ export default function TestDetailView({
   const [studentNameById, setStudentNameById] = useState<Map<string, string>>(new Map());
   const [selectedAttemptDetail, setSelectedAttemptDetail] = useState<GradedAttemptDetail | null>(null);
 
+  const [isAdminBusy, setIsAdminBusy] = useState(false);
+
   const hasContext = Boolean(testId);
+
+  async function administerTest(action: "open_now" | "close_now") {
+    if (!testId) return;
+    setIsAdminBusy(true);
+    try {
+      await handleJson(
+        await graiderFetch(`/api/tests/${testId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action }),
+        }),
+      );
+      await loadData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update test.");
+    } finally {
+      setIsAdminBusy(false);
+    }
+  }
 
   async function loadData() {
     if (!testId) return;
@@ -139,6 +178,47 @@ export default function TestDetailView({
           {error ? (
             <Card className="border-pen-soft/60 bg-pen-wash">
               <Text className="text-sm font-medium text-pen-deep">{error}</Text>
+            </Card>
+          ) : null}
+
+          {test ? (
+            <Card className="gap-3">
+              <View className="flex-row items-center justify-between">
+                <Text className="text-xs font-semibold uppercase tracking-wide text-ink-faint">Administer</Text>
+                <Badge variant={statusBadgeVariant(test.status)}>{test.status ?? "draft"}</Badge>
+              </View>
+              {(test.opens_at ?? test.closes_at ?? test.duration_minutes) ? (
+                <View className="flex-row flex-wrap gap-x-4 gap-y-0.5">
+                  {test.opens_at ? (
+                    <Text className="text-xs text-ink-faint">Opens {formatScheduleDate(test.opens_at)}</Text>
+                  ) : null}
+                  {test.closes_at ? (
+                    <Text className="text-xs text-ink-faint">Closes {formatScheduleDate(test.closes_at)}</Text>
+                  ) : null}
+                  {test.duration_minutes ? (
+                    <Text className="text-xs text-ink-faint">{test.duration_minutes} min</Text>
+                  ) : null}
+                </View>
+              ) : null}
+              <View className="flex-row gap-2">
+                {test.status !== "open" ? (
+                  <Pressable
+                    disabled={isAdminBusy}
+                    onPress={() => void administerTest("open_now")}
+                    className={`${btnPrimary} flex-1 items-center`}
+                  >
+                    <Text className="text-sm font-medium text-white">Open now</Text>
+                  </Pressable>
+                ) : (
+                  <Pressable
+                    disabled={isAdminBusy}
+                    onPress={() => void administerTest("close_now")}
+                    className={`${btnSecondary} flex-1 items-center`}
+                  >
+                    <Text className="text-sm font-medium text-pen-deep">Close now</Text>
+                  </Pressable>
+                )}
+              </View>
             </Card>
           ) : null}
 

@@ -1,6 +1,6 @@
 import { View, Text, Pressable } from "react-native";
 import { useState } from "react";
-import { ChevronRight } from "lucide-react-native";
+import { ChevronRight, Pencil, Users } from "lucide-react-native";
 import {
   Badge,
   Card,
@@ -15,8 +15,9 @@ import { IconHome } from "@/components/shared/icons";
 import { handleJson, GraiderApiError } from "@/lib/dashboard-client";
 import { useGraiderFetch } from "@/lib/graider-fetch";
 import { useSubscription } from "@/components/subscriptions/SubscriptionProvider";
-import type { DashboardClass, DashboardTest } from "@/lib/dashboard-types";
+import type { DashboardClass, DashboardTest, Invitation } from "@/lib/dashboard-types";
 import ClassSelector from "@/components/teacher/ClassSelector";
+import InvitesPanel from "@/components/teacher/InvitesPanel";
 
 type TeacherClassesViewProps = {
   classes: DashboardClass[];
@@ -45,8 +46,19 @@ export default function TeacherClassesView({
 }: TeacherClassesViewProps) {
   const graiderFetch = useGraiderFetch();
   const { showPaywall } = useSubscription();
+
+  // Create
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [className, setClassName] = useState("");
+
+  // Rename
+  const [renameModalOpen, setRenameModalOpen] = useState(false);
+  const [renamingClass, setRenamingClass] = useState<DashboardClass | null>(null);
+  const [renameName, setRenameName] = useState("");
+
+  // Invites
+  const [expandedInvitesClassId, setExpandedInvitesClassId] = useState<string | null>(null);
+  const [invitationsByClass, setInvitationsByClass] = useState<Map<string, Invitation[]>>(new Map());
 
   function openCreateModal() {
     setClassName("");
@@ -81,6 +93,54 @@ export default function TeacherClassesView({
       if (error instanceof Error) onStatus(error.message, "error");
     } finally {
       setBusy(false);
+    }
+  }
+
+  function openRenameModal(entry: DashboardClass) {
+    setRenamingClass(entry);
+    setRenameName(entry.name);
+    setRenameModalOpen(true);
+  }
+
+  async function saveRename() {
+    if (!renamingClass || !renameName.trim()) return;
+    setBusy(true);
+    try {
+      await handleJson(
+        await graiderFetch(`/api/classes/${renamingClass.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: renameName.trim() }),
+        }),
+      );
+      setRenameModalOpen(false);
+      setRenamingClass(null);
+      onStatus(`Class renamed to "${renameName.trim()}".`);
+      await onCreated();
+    } catch (error) {
+      if (error instanceof Error) onStatus(error.message, "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function loadInvitations(classId: string) {
+    try {
+      const payload = await handleJson<{ invitations: Invitation[] }>(
+        await graiderFetch(`/api/classes/${classId}/invite`, { cache: "no-store" }),
+      );
+      setInvitationsByClass((prev) => new Map(prev).set(classId, payload.invitations ?? []));
+    } catch {
+      // silently ignore — InvitesPanel shows empty state
+    }
+  }
+
+  function toggleInvites(classId: string) {
+    if (expandedInvitesClassId === classId) {
+      setExpandedInvitesClassId(null);
+    } else {
+      setExpandedInvitesClassId(classId);
+      void loadInvitations(classId);
     }
   }
 
@@ -122,16 +182,22 @@ export default function TeacherClassesView({
             const classTests = tests.filter((t) => t.class_id === entry.id);
             const gradedCount = attemptsGradedCountByClass.get(entry.id) ?? 0;
             const isActive = entry.id === selectedClassId;
+            const invitesExpanded = expandedInvitesClassId === entry.id;
+            const invitations = invitationsByClass.get(entry.id) ?? [];
+            const activeInviteCount = invitations.filter(
+              (inv) => inv.status !== "accepted" && (!inv.expires_at || new Date(inv.expires_at) >= new Date()),
+            ).length;
+
             return (
-              <Pressable
+              <View
                 key={entry.id}
-                onPress={() => onOpenClass(entry.id)}
-                className={`rounded-2xl border bg-paper p-4 shadow-paper ${
+                className={`overflow-hidden rounded-2xl border bg-paper shadow-paper ${
                   isActive ? "border-pen bg-pen-wash/30" : "border-line"
                 }`}
               >
-                <View className="flex-row items-start gap-3">
-                  <View className="flex-1" style={{ minWidth: 0 }}>
+                {/* Main row: tap to open class */}
+                <View className="flex-row items-start gap-3 p-4">
+                  <Pressable className="flex-1" onPress={() => onOpenClass(entry.id)}>
                     <View className="flex-row flex-wrap items-center gap-2">
                       <Text className="font-display text-base font-semibold text-ink" numberOfLines={2}>
                         {entry.name}
@@ -142,15 +208,48 @@ export default function TeacherClassesView({
                       {classTests.length} test{classTests.length !== 1 ? "s" : ""}
                       {gradedCount > 0 ? ` · ${gradedCount} graded` : ""}
                     </Text>
+                  </Pressable>
+                  <View className="flex-row items-center gap-3 pt-0.5">
+                    <Pressable hitSlop={8} onPress={() => openRenameModal(entry)}>
+                      <Pencil size={14} color={isActive ? "#99291f" : "#a3927b"} />
+                    </Pressable>
+                    <Pressable hitSlop={4} onPress={() => onOpenClass(entry.id)}>
+                      <ChevronRight size={20} color={isActive ? "#99291f" : "#a3927b"} />
+                    </Pressable>
                   </View>
-                  <ChevronRight size={20} color={isActive ? "#99291f" : "#a3927b"} />
                 </View>
-              </Pressable>
+
+                {/* Invites toggle bar */}
+                <Pressable
+                  onPress={() => toggleInvites(entry.id)}
+                  className="flex-row items-center gap-1.5 border-t border-line/50 px-4 py-2"
+                >
+                  <Users size={11} color="#a3927b" />
+                  <Text className="flex-1 text-xs font-medium text-pen-deep">
+                    Invites{activeInviteCount > 0 ? ` · ${activeInviteCount} active` : ""}
+                  </Text>
+                  <Text className="text-[10px] text-ink-faint">{invitesExpanded ? "▲" : "▼"}</Text>
+                </Pressable>
+
+                {invitesExpanded ? (
+                  <View className="px-4 pb-4">
+                    <InvitesPanel
+                      classId={entry.id}
+                      invitations={invitations}
+                      onChange={() => loadInvitations(entry.id)}
+                      onStatus={onStatus}
+                      isBusy={isBusy}
+                      setBusy={setBusy}
+                    />
+                  </View>
+                ) : null}
+              </View>
             );
           })}
         </View>
       )}
 
+      {/* Create class sheet */}
       <FormSheet
         visible={createModalOpen}
         title="Create class"
@@ -166,6 +265,25 @@ export default function TeacherClassesView({
             value={className}
             onChangeText={setClassName}
             placeholder="e.g. Year 10 Biology"
+            autoFocus
+          />
+        </FormField>
+      </FormSheet>
+
+      {/* Rename class sheet */}
+      <FormSheet
+        visible={renameModalOpen}
+        title="Rename class"
+        onClose={() => { setRenameModalOpen(false); setRenamingClass(null); }}
+        primaryLabel="Save"
+        onPrimary={() => void saveRename()}
+        primaryDisabled={!renameName.trim() || isBusy}
+        primaryLoading={isBusy}
+      >
+        <FormField label="Class name">
+          <GraiderTextInput
+            value={renameName}
+            onChangeText={setRenameName}
             autoFocus
           />
         </FormField>

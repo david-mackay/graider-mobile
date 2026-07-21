@@ -93,6 +93,7 @@ export type Invitation = {
   expires_at: string | null;
   created_at: string | null;
   accepted_by_name: string | null;
+  single_use?: boolean;
 };
 
 export type DashboardGradeStackJob = GradeStackJob & {

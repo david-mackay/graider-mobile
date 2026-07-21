@@ -9,8 +9,8 @@ import { formatRelativeDate } from "@/lib/format-date";
 import { useGraiderFetch } from "@/lib/graider-fetch";
 import { handleJson } from "@/lib/dashboard-client";
 import { formatStudentDisplayName } from "@/lib/roster-display";
-import type { GradedAttemptDetail, RosterEntry } from "@/lib/dashboard-types";
-import type { StackCommitResult } from "@/lib/types";
+import type { GradedAttemptDetail } from "@/lib/dashboard-types";
+import type { RosterEntry, StackCommitResult } from "@/lib/types";
 
 type StepResultsProps = {
   results: StackCommitResult;

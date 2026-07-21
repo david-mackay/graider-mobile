@@ -42,7 +42,7 @@ export type UseStackGradeReturn = {
   actions: {
     selectTest: (test: TestSummary) => void;
     selectAutoGrade: (classId: string, className: string) => void;
-    submitImages: (files: PickedImage[]) => Promise<void>;
+    submitImages: (files: PickedImage[], parsePreset?: string) => Promise<void>;
     setAssignment: (pageIndex: number, value: AssignmentValue) => void;
     confirmAll: () => Promise<void>;
     back: () => void;
@@ -136,7 +136,7 @@ export function useStackGrade(): UseStackGradeReturn {
   }
 
   const submitImages = useCallback(
-    async (files: PickedImage[]) => {
+    async (files: PickedImage[], parsePreset?: string) => {
       if (gradingMode === "selected" && !selectedTest) {
         setErrorMessage("Pick a test first.");
         return;
@@ -168,6 +168,7 @@ export function useStackGrade(): UseStackGradeReturn {
           formData.append("classId", selectedTest!.class_id);
         }
         formData.append("idempotencyKey", idempotencyKey);
+        if (parsePreset) formData.append("parsePreset", parsePreset);
         for (const file of files) {
           appendImageToFormData(formData, "images", file);
         }

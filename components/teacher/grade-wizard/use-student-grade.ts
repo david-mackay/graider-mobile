@@ -3,6 +3,10 @@ import { handleJson, GraiderApiError } from "@/lib/dashboard-client";
 import { useGraiderFetch } from "@/lib/graider-fetch";
 import { appendImageToFormData, type PickedImage } from "@/lib/picked-image";
 import {
+  defaultPresetForSurface,
+  type DocumentParsePreset,
+} from "@/lib/parse-presets";
+import {
   flattenStudentBuckets,
   totalPageCount,
   MAX_TOTAL_PAGES,
@@ -50,6 +54,7 @@ export type UseStudentGradeReturn = {
   gradingPhase: GradingPhase | null;
   activeJob: GradeStackJob | null;
   studentProgress: StudentGradingProgress[];
+  parsePreset: DocumentParsePreset;
   errorMessage: string;
   limitCode: string | null;
   isBusy: boolean;
@@ -64,6 +69,9 @@ export type UseStudentGradeReturn = {
     removeBucket: (studentId: string) => void;
     resumeStudent: (studentId: string) => void;
     startAddStudent: () => void;
+    setParsePreset: (preset: DocumentParsePreset) => void;
+    /** Replace the ocrAnswers for a specific page in the preview. */
+    setOcrAnswers: (pageIndex: number, answers: OcrAnswer[]) => void;
     submitSession: () => Promise<void>;
     confirmAll: () => Promise<void>;
     resumeFromJob: (jobId: string) => Promise<void>;
@@ -140,8 +148,15 @@ export function useStudentGrade(): UseStudentGradeReturn {
   const [pageToStudentId, setPageToStudentId] = useState<Map<number, string>>(new Map());
   const [gradingPhase, setGradingPhase] = useState<GradingPhase | null>(null);
   const [activeJob, setActiveJob] = useState<GradeStackJob | null>(null);
+  const [parsePreset, setParsePresetState] = useState<DocumentParsePreset>(() =>
+    defaultPresetForSurface("grade_stack"),
+  );
 
   const isBusy = state === "grading";
+
+  const setParsePreset = useCallback((preset: DocumentParsePreset) => {
+    setParsePresetState(preset);
+  }, []);
 
   const sessionStudents = useMemo(() => {
     const fromBuckets = buckets
@@ -313,6 +328,18 @@ export function useStudentGrade(): UseStudentGradeReturn {
     setState("pickStudent");
   }, []);
 
+  const setOcrAnswers = useCallback((pageIndex: number, answers: OcrAnswer[]) => {
+    setPreview((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        pages: prev.pages.map((page) =>
+          page.pageIndex === pageIndex ? { ...page, ocrAnswers: answers } : page,
+        ),
+      };
+    });
+  }, []);
+
   const submitSession = useCallback(async () => {
     if (gradingMode === "selected" && !selectedTest) {
       setErrorMessage("Pick a test first.");
@@ -357,6 +384,7 @@ export function useStudentGrade(): UseStudentGradeReturn {
       }
       formData.append("idempotencyKey", idempotencyKey);
       formData.append("gradingMode", "student_first");
+      formData.append("parsePreset", parsePreset);
       formData.append(
         "studentPageAssignments",
         JSON.stringify(
@@ -410,7 +438,7 @@ export function useStudentGrade(): UseStudentGradeReturn {
       setActiveJob(null);
       setState("sessionSummary");
     }
-  }, [buckets, gradingMode, selectedTest, autoClassId, graiderFetch]);
+  }, [buckets, gradingMode, selectedTest, autoClassId, graiderFetch, parsePreset]);
 
   const confirmAll = useCallback(async () => {
     const testId = selectedTest?.id;
@@ -572,6 +600,7 @@ export function useStudentGrade(): UseStudentGradeReturn {
     setPageToStudentId(new Map());
     setGradingPhase(null);
     setActiveJob(null);
+    setParsePresetState(defaultPresetForSurface("grade_stack"));
     setErrorMessage("");
     setState("pickTest");
   }, []);
@@ -593,6 +622,8 @@ export function useStudentGrade(): UseStudentGradeReturn {
       removeBucket,
       resumeStudent,
       startAddStudent,
+      setParsePreset,
+      setOcrAnswers,
       submitSession,
       confirmAll,
       resumeFromJob,
@@ -611,6 +642,8 @@ export function useStudentGrade(): UseStudentGradeReturn {
       removeBucket,
       resumeStudent,
       startAddStudent,
+      setParsePreset,
+      setOcrAnswers,
       submitSession,
       confirmAll,
       resumeFromJob,
@@ -635,6 +668,7 @@ export function useStudentGrade(): UseStudentGradeReturn {
     gradingPhase,
     activeJob,
     studentProgress,
+    parsePreset,
     errorMessage,
     limitCode,
     isBusy,

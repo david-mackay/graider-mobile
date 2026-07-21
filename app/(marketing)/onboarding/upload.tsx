@@ -19,6 +19,11 @@ import {
   type OnboardingStudentSubmission,
 } from "@/lib/onboarding/types";
 import { appendImageToFormData, type PickedImage } from "@/lib/picked-image";
+import ParsePresetPicker from "@/components/shared/ParsePresetPicker";
+import {
+  defaultPresetForSurface,
+  type DocumentParsePreset,
+} from "@/lib/parse-presets";
 
 function papersToPickedImages(papers: OnboardingPaper[]): PickedImage[] {
   return papers
@@ -45,6 +50,9 @@ export default function OnboardingUploadPage() {
   const [rateLimited, setRateLimited] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
   const [gradingProgress, setGradingProgress] = useState<string | null>(null);
+  const [parsePreset, setParsePreset] = useState<DocumentParsePreset>(() =>
+    defaultPresetForSurface("student_ocr"),
+  );
 
   useEffect(() => {
     fireEvent(ONBOARDING_EVENTS.PAPER_UPLOAD);
@@ -224,6 +232,7 @@ export default function OnboardingUploadPage() {
     if (student.source === "typed" && student.typedAnswers) {
       formData.append("typedAnswers", JSON.stringify(student.typedAnswers));
     } else if (student.papers?.length) {
+      formData.append("parsePreset", parsePreset);
       for (const paper of student.papers) {
         const uri = paper.fileUri;
         if (!uri) throw new Error(`Missing photo for ${student.name}.`);
@@ -358,20 +367,28 @@ export default function OnboardingUploadPage() {
         </View>
 
         {mode === "photo" ? (
-          <TouchableOpacity
-            onPress={() => setPhase("capture")}
-            disabled={isBusy}
-            className="items-center rounded-2xl border-2 border-dashed border-line bg-cream py-8"
-          >
-            <Text className="text-sm font-bold text-ink">
-              {pendingPages.length === 0
-                ? "Tap to capture pages"
-                : `${pendingPages.length} page${pendingPages.length === 1 ? "" : "s"} — tap to review`}
-            </Text>
-            <Text className="mt-1 text-xs text-ink-faint">
-              Camera or photo library · reorder after
-            </Text>
-          </TouchableOpacity>
+          <View className="gap-3">
+            <ParsePresetPicker
+              surface="student_ocr"
+              value={parsePreset}
+              onChange={setParsePreset}
+              disabled={isBusy}
+            />
+            <TouchableOpacity
+              onPress={() => setPhase("capture")}
+              disabled={isBusy}
+              className="items-center rounded-2xl border-2 border-dashed border-line bg-cream py-8"
+            >
+              <Text className="text-sm font-bold text-ink">
+                {pendingPages.length === 0
+                  ? "Tap to capture pages"
+                  : `${pendingPages.length} page${pendingPages.length === 1 ? "" : "s"} — tap to review`}
+              </Text>
+              <Text className="mt-1 text-xs text-ink-faint">
+                Camera or photo library · reorder after
+              </Text>
+            </TouchableOpacity>
+          </View>
         ) : (
           <View className="gap-4">
             {keys.map((key, index) => (

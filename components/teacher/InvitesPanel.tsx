@@ -45,6 +45,7 @@ export default function InvitesPanel({
 }: InvitesPanelProps) {
   const graiderFetch = useGraiderFetch();
   const [inviteExpiry, setInviteExpiry] = useState("0");
+  const [singleUse, setSingleUse] = useState(true);
   const [copiedId, setCopiedId] = useState("");
 
   async function generateInvite(role: "student" | "teacher") {
@@ -55,7 +56,12 @@ export default function InvitesPanel({
         await graiderFetch(`/api/classes/${classId}/invite`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ invited_email: null, role, expires_in_days: expiresInDays }),
+          body: JSON.stringify({
+            invited_email: null,
+            role,
+            expires_in_days: expiresInDays,
+            single_use: singleUse,
+          }),
         }),
       );
       onStatus(`New ${role} invite code generated.`);
@@ -88,7 +94,9 @@ export default function InvitesPanel({
 
   async function copyCode(id: string, code: string) {
     try {
-      await Clipboard.setStringAsync(code);
+      const base = process.env.EXPO_PUBLIC_APP_URL ?? "";
+      const text = base ? `${base}/s?join=${code}` : code;
+      await Clipboard.setStringAsync(text);
       setCopiedId(id);
       setTimeout(() => setCopiedId((c) => (c === id ? "" : c)), 2000);
     } catch (error) {
@@ -127,6 +135,15 @@ export default function InvitesPanel({
         >
           <Text className="text-pen-deep font-medium text-xs">+ Teacher code</Text>
         </TouchableOpacity>
+        <TouchableOpacity
+          disabled={isBusy}
+          onPress={() => setSingleUse((v) => !v)}
+          className={`rounded-full border px-3 py-1.5 ${singleUse ? "border-pen bg-pen-wash" : "border-line bg-paper"}`}
+        >
+          <Text className={`text-xs font-medium ${singleUse ? "text-pen-deep" : "text-ink-soft"}`}>
+            {singleUse ? "Single-use on" : "Reusable"}
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {invitations.length === 0 ? (
@@ -151,6 +168,11 @@ export default function InvitesPanel({
                 <Badge variant={derivedStatus === "active" ? "green" : derivedStatus === "expired" ? "yellow" : "gray"}>
                   {derivedStatus}
                 </Badge>
+                {inv.single_use !== false ? (
+                  <Badge variant="gray">Single-use</Badge>
+                ) : (
+                  <Badge variant="blue">Reusable</Badge>
+                )}
                 <Text className="text-xs text-ink-faint">
                   {derivedStatus === "accepted" && inv.accepted_by_name
                     ? inv.accepted_by_name

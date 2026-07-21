@@ -74,6 +74,7 @@ export default function GradeWizard() {
     errorMessage,
     limitCode,
     isBusy,
+    parsePreset,
     actions,
   } = wizard;
   const { canGradeStack, showPaywall, refreshSubscription, subscription } = useSubscription();
@@ -313,6 +314,8 @@ export default function GradeWizard() {
                 ? autoClassName ?? "Smart grade session"
                 : selectedTest!.title
             }
+            parsePreset={parsePreset}
+            onParsePresetChange={actions.setParsePreset}
             onAddStudent={actions.startAddStudent}
             onResumeStudent={actions.resumeStudent}
             onRemoveStudent={actions.removeBucket}
@@ -352,6 +355,7 @@ export default function GradeWizard() {
             pages={preview.pages}
             pageToStudentId={pageToStudentId}
             roster={roster}
+            onOcrAnswersChange={actions.setOcrAnswers}
             onConfirm={actions.confirmAll}
             onBack={actions.back}
             isBusy={isBusy}

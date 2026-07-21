@@ -25,6 +25,11 @@ import {
 } from "@/lib/onboarding/types";
 import { resolveGraiderApiUrl } from "@/lib/graider-fetch";
 import { appendDocumentToFormData } from "@/lib/picked-document";
+import ParsePresetPicker from "@/components/shared/ParsePresetPicker";
+import {
+  defaultPresetForSurface,
+  type DocumentParsePreset,
+} from "@/lib/parse-presets";
 
 const DEFAULT_PROMPT = "Name two functions of the mitochondria.";
 const DEFAULT_CORRECT_ANSWER =
@@ -106,6 +111,9 @@ export default function OnboardingAnswerKeyPage() {
   const [manualType, setManualType] = useState<"open" | "mcq">("open");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [parsePreset, setParsePreset] = useState<DocumentParsePreset>(() =>
+    defaultPresetForSurface("answer_key_pdf"),
+  );
 
   useEffect(() => {
     fireEvent(ONBOARDING_EVENTS.ANSWER_KEY);
@@ -200,6 +208,7 @@ export default function OnboardingAnswerKeyPage() {
         name: asset.name || "answer-key.pdf",
         mimeType: asset.mimeType || "application/pdf",
       });
+      formData.append("parsePreset", parsePreset);
 
       const res = await fetch(resolveGraiderApiUrl("/api/onboarding/parse-answer-key"), {
         method: "POST",
@@ -236,6 +245,11 @@ export default function OnboardingAnswerKeyPage() {
       );
 
       const formData = new FormData();
+      const preset =
+        parsePreset === "typed_pdf"
+          ? defaultPresetForSurface("answer_key_photo")
+          : parsePreset;
+      if (preset !== parsePreset) setParsePreset(preset);
       result.assets.forEach((asset, index) => {
         appendDocumentToFormData(formData, "image", {
           uri: asset.uri,
@@ -243,6 +257,7 @@ export default function OnboardingAnswerKeyPage() {
           mimeType: asset.mimeType || "image/jpeg",
         });
       });
+      formData.append("parsePreset", preset);
 
       const res = await fetch(resolveGraiderApiUrl("/api/onboarding/parse-answer-key"), {
         method: "POST",
@@ -335,6 +350,14 @@ export default function OnboardingAnswerKeyPage() {
                 <Text className="mt-2 text-sm leading-relaxed text-ink-soft">
                   PDF for typed keys, or a photo if answers are circled / the PDF is a scan.
                 </Text>
+                <View className="mt-4">
+                  <ParsePresetPicker
+                    surface="answer_key_pdf"
+                    value={parsePreset}
+                    onChange={setParsePreset}
+                    disabled={busy}
+                  />
+                </View>
                 <TouchableOpacity
                   onPress={() => void onPickPdf()}
                   disabled={busy}

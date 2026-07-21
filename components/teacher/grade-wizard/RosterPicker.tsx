@@ -9,7 +9,7 @@ import {
 import {
   SKIP_VALUE,
   type AssignmentValue,
-} from "@/components/teacher/grade-wizard/use-student-grade";
+} from "@/components/teacher/grade-wizard/use-stack-grade";
 
 type RosterPickerProps = {
   roster: RosterEntry[];

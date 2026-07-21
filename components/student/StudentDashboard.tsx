@@ -2,7 +2,7 @@ import { View, Text, TouchableOpacity, TextInput, ScrollView } from 'react-nativ
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useUser } from "@clerk/clerk-expo";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Picker } from "@react-native-picker/picker";
 import { Platform } from "react-native";
@@ -124,6 +124,7 @@ function StudentBottomNav({
 export default function StudentDashboard() {
   const { isLoaded, isSignedIn } = useUser();
   const router = useRouter();
+  const { join: joinParam } = useLocalSearchParams<{ join?: string }>();
   const insets = useSafeAreaInsets();
   const graiderFetch = useGraiderFetch();
   const loadInFlightRef = useRef(false);
@@ -143,7 +144,7 @@ export default function StudentDashboard() {
   const [testTakingAnswers, setTestTakingAnswers] = useState<Record<string, string>>({});
   const [selectedAttemptDetail, setSelectedAttemptDetail] = useState<GradedAttemptDetail | null>(null);
 
-  const [joinCode, setJoinCode] = useState("");
+  const [joinCode, setJoinCode] = useState(typeof joinParam === "string" ? joinParam : "");
   const [joinEmail, setJoinEmail] = useState("");
 
   const [statusMessage, setStatusMessage] = useState("");
@@ -278,16 +279,35 @@ export default function StudentDashboard() {
 
   async function openTestForSubmission(testId: string) {
     try {
+      const started = await handleJson<{
+        attempt_id: string;
+        started_at: string | null;
+        deadline_at: string | null;
+        duration_minutes: number | null;
+      }>(
+        await graiderFetch("/api/submissions/start", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ testId }),
+        }),
+      );
       const payload = await handleJson<{ test: TestDetail }>(
         await graiderFetch(`/api/tests/${testId}`, { cache: "no-store" }),
       );
-      setSelectedTest(payload.test);
+      setSelectedTest({
+        ...payload.test,
+        // stash deadline on detail for timer if form supports it later
+        available_now: true,
+        duration_minutes: started.duration_minutes ?? payload.test.duration_minutes ?? null,
+      });
       const initial: Record<string, string> = {};
       for (const q of payload.test.questions) initial[q.question_id] = "";
       setTestTakingAnswers(initial);
       setSelectedClassId(payload.test.class_id);
+      void started;
     } catch (error) {
       if (error instanceof Error) setStatus(error.message, "error");
+      await loadDashboard();
     }
   }
 

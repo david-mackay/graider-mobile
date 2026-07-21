@@ -1,11 +1,15 @@
 import { View, Text, TouchableOpacity, ScrollView } from "react-native";
 import { Card, btnPrimary, btnSecondary } from "@/components/shared/ui";
+import ParsePresetPicker from "@/components/shared/ParsePresetPicker";
+import type { DocumentParsePreset } from "@/lib/parse-presets";
 import type { StudentBucket } from "@/lib/student-grade";
 import { totalPageCount } from "@/lib/student-grade";
 
 type StepSessionSummaryProps = {
   buckets: StudentBucket[];
   testTitle: string;
+  parsePreset: DocumentParsePreset;
+  onParsePresetChange: (preset: DocumentParsePreset) => void;
   onAddStudent: () => void;
   onResumeStudent: (studentId: string) => void;
   onRemoveStudent: (studentId: string) => void;
@@ -18,6 +22,8 @@ type StepSessionSummaryProps = {
 export default function StepSessionSummary({
   buckets,
   testTitle,
+  parsePreset,
+  onParsePresetChange,
   onAddStudent,
   onResumeStudent,
   onRemoveStudent,
@@ -37,6 +43,15 @@ export default function StepSessionSummary({
           {testTitle} · {captured.length} student{captured.length === 1 ? "" : "s"} · {pageTotal} page
           {pageTotal === 1 ? "" : "s"}
         </Text>
+      </Card>
+
+      <Card>
+        <ParsePresetPicker
+          surface="grade_stack"
+          value={parsePreset}
+          onChange={onParsePresetChange}
+          disabled={isBusy}
+        />
       </Card>
 
       {errorMessage ? (
