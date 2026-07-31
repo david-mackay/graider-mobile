@@ -5,33 +5,51 @@ import { useRouter } from "expo-router";
 import { Platform } from "react-native";
 import { handleJson } from "@/lib/dashboard-client";
 import { useGraiderFetch } from "@/lib/graider-fetch";
-import { parsePushNotificationData, registerForExpoPushToken } from "@/lib/push-notifications";
+import {
+  isActionablePushData,
+  parsePushNotificationData,
+  pushResponseKey,
+  registerForExpoPushToken,
+  type PushNotificationData,
+} from "@/lib/push-notifications";
+
+function clearHandledNotificationResponse() {
+  try {
+    Notifications.clearLastNotificationResponse();
+  } catch {
+    // Older native builds may not expose this; ignore.
+  }
+}
 
 function navigateFromPushData(
   router: ReturnType<typeof useRouter>,
-  data: ReturnType<typeof parsePushNotificationData>,
+  data: PushNotificationData,
 ) {
-  if (data.type?.startsWith("grade_stack") || data.screen === "grade") {
-    if (data.jobId) {
-      router.push({ pathname: "/(teacher)/grade", params: { jobId: data.jobId } });
-    } else {
-      router.push("/(teacher)/grade");
-    }
+  if (!isActionablePushData(data)) {
+    router.push("/(teacher)");
     return;
   }
-  router.push("/(teacher)");
+  if (data.jobId) {
+    router.push({ pathname: "/(teacher)/grade", params: { jobId: data.jobId } });
+    return;
+  }
+  router.push("/(teacher)/grade");
 }
 
 /**
  * Registers Expo push tokens with the Graider API and handles notification taps.
- * Teachers only — grading alerts are not relevant to student accounts.
+ *
+ * Push can arrive while the Clerk session is cold — we queue the deep link and
+ * only navigate after sign-in, so we don't bounce `/(teacher)` ↔ `/` in a loop.
  */
 export default function PushNotificationsProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const graiderFetch = useGraiderFetch();
-  const { isSignedIn } = useAuth();
+  const { isLoaded, isSignedIn } = useAuth();
   const { user } = useUser();
   const registeredTokenRef = useRef<string | null>(null);
+  const pendingDataRef = useRef<PushNotificationData | null>(null);
+  const handledResponseKeysRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     if (!isSignedIn || !user) return;
@@ -77,10 +95,26 @@ export default function PushNotificationsProvider({ children }: { children: Reac
   }, [graiderFetch, isSignedIn, user?.id]);
 
   useEffect(() => {
+    if (!isLoaded) return;
+
     const openFromResponse = (response: Notifications.NotificationResponse | null) => {
       if (!response) return;
+      const key = pushResponseKey(response);
+      if (handledResponseKeysRef.current.has(key)) return;
+      handledResponseKeysRef.current.add(key);
+
       const data = parsePushNotificationData(response.notification.request.content.data);
+      if (!isActionablePushData(data)) return;
+
+      if (!isSignedIn) {
+        // Keep the deep link until Clerk finishes signing in.
+        pendingDataRef.current = data;
+        return;
+      }
+
+      pendingDataRef.current = null;
       navigateFromPushData(router, data);
+      clearHandledNotificationResponse();
     };
 
     const last = Notifications.getLastNotificationResponse();
@@ -88,7 +122,17 @@ export default function PushNotificationsProvider({ children }: { children: Reac
 
     const subscription = Notifications.addNotificationResponseReceivedListener(openFromResponse);
     return () => subscription.remove();
-  }, [router]);
+  }, [isLoaded, isSignedIn, router]);
+
+  // After a cold start sign-in, apply any deferred push deep link once.
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn) return;
+    const pending = pendingDataRef.current;
+    if (!pending || !isActionablePushData(pending)) return;
+    pendingDataRef.current = null;
+    navigateFromPushData(router, pending);
+    clearHandledNotificationResponse();
+  }, [isLoaded, isSignedIn, router]);
 
   return children;
 }

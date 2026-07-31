@@ -63,8 +63,9 @@ export async function registerForExpoPushToken(): Promise<PushRegistrationResult
   }
 }
 
+/** Actionable pushes only — failures are not sent from the API. */
 export type PushNotificationData = {
-  type?: "grade_stack_preview" | "grade_stack_commit" | "grade_stack_failed";
+  type?: "grade_stack_preview" | "grade_stack_commit";
   jobId?: string;
   screen?: string;
 };
@@ -74,12 +75,22 @@ export function parsePushNotificationData(data: unknown): PushNotificationData {
   const record = data as Record<string, unknown>;
   return {
     type:
-      record.type === "grade_stack_preview" ||
-      record.type === "grade_stack_commit" ||
-      record.type === "grade_stack_failed"
+      record.type === "grade_stack_preview" || record.type === "grade_stack_commit"
         ? record.type
         : undefined,
     jobId: typeof record.jobId === "string" ? record.jobId : undefined,
     screen: typeof record.screen === "string" ? record.screen : undefined,
   };
+}
+
+export function pushResponseKey(response: Notifications.NotificationResponse): string {
+  return `${response.notification.request.identifier}:${response.actionIdentifier}`;
+}
+
+/** True when this push has somewhere useful to land (review or results). */
+export function isActionablePushData(data: PushNotificationData): boolean {
+  if (data.type === "grade_stack_preview" || data.type === "grade_stack_commit") {
+    return Boolean(data.jobId);
+  }
+  return false;
 }
