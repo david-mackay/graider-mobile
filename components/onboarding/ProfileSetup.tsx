@@ -11,6 +11,8 @@ type ProfileSetupProps = {
   initialName?: string;
   initialRole: AppRole;
   initialInviteCode?: string;
+  /** When set, role cannot be changed (enforces teacher vs student entry paths). */
+  lockedRole?: AppRole;
   onComplete: (data: { full_name: string; role: AppRole }) => void | Promise<void>;
 };
 
@@ -18,18 +20,22 @@ export default function ProfileSetup({
   initialName = "",
   initialRole,
   initialInviteCode = "",
+  lockedRole,
   onComplete,
 }: ProfileSetupProps) {
   const graiderFetch = useGraiderFetch();
   const [name, setName] = useState(initialName);
-  const [role, setRole] = useState<AppRole>(initialRole);
+  const [role, setRole] = useState<AppRole>(lockedRole ?? initialRole);
   const [inviteCode, setInviteCode] = useState(initialInviteCode);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const roleLocked = Boolean(lockedRole);
+  const effectiveRole = lockedRole ?? role;
+
   async function submit() {
     if (!name.trim()) return;
-    if (role === "student" && !inviteCode.trim()) {
+    if (effectiveRole === "student" && !inviteCode.trim()) {
       setError("Students need an invite code from their teacher to join.");
       return;
     }
@@ -43,12 +49,12 @@ export default function ProfileSetup({
           body: JSON.stringify({ full_name: name }),
         }),
       );
-      if (role === "student") {
+      if (effectiveRole === "student") {
         await handleJson(
           await graiderFetch("/api/classes/join", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ inviteCode: inviteCode.trim() }),
+            body: JSON.stringify({ inviteCode: inviteCode.trim().toUpperCase() }),
           }),
         );
       }
@@ -56,10 +62,10 @@ export default function ProfileSetup({
         await graiderFetch("/api/me/role", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ role }),
+          body: JSON.stringify({ role: effectiveRole }),
         }),
       );
-      await onComplete({ full_name: name, role });
+      await onComplete({ full_name: name, role: effectiveRole });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unexpected error");
     } finally {
@@ -69,12 +75,16 @@ export default function ProfileSetup({
 
   const roleOption = (value: AppRole, label: string, sub: string) => (
     <TouchableOpacity
-      onPress={() => setRole(value)}
+      disabled={roleLocked && lockedRole !== value}
+      onPress={() => {
+        if (roleLocked) return;
+        setRole(value);
+      }}
       className={`flex-1 rounded-2xl border-2 px-4 py-3 ${
-        role === value ? "border-pen bg-pen-wash" : "border-line bg-paper"
-      }`}
+        effectiveRole === value ? "border-pen bg-pen-wash" : "border-line bg-paper"
+      } ${roleLocked && lockedRole !== value ? "opacity-40" : ""}`}
     >
-      <Text className={`text-sm font-bold ${role === value ? "text-pen-deep" : "text-ink"}`}>{label}</Text>
+      <Text className={`text-sm font-bold ${effectiveRole === value ? "text-pen-deep" : "text-ink"}`}>{label}</Text>
       <Text className="mt-0.5 text-xs text-ink-faint">{sub}</Text>
     </TouchableOpacity>
   );
@@ -108,7 +118,7 @@ export default function ProfileSetup({
                 {roleOption("student", "Student", "Take tests")}
               </View>
             </FormField>
-            {role === "student" ? (
+            {effectiveRole === "student" ? (
               <FormField label="Invite code" hint="From your teacher — enter it when you sign up.">
                 <TextInput
                   className={`${inputClass} font-mono tracking-widest uppercase`}
@@ -122,12 +132,12 @@ export default function ProfileSetup({
             ) : null}
             {error ? <Text className="text-xs font-bold text-pen-deep">{error}</Text> : null}
             <TouchableOpacity
-              disabled={busy || !name.trim() || (role === "student" && !inviteCode.trim())}
+              disabled={busy || !name.trim() || (effectiveRole === "student" && !inviteCode.trim())}
               className={`${btnPrimary} w-full justify-center py-3`}
               onPress={submit}
             >
               <Text className="font-bold text-white">
-                {busy ? "Saving…" : role === "student" ? "Join class" : "Continue"}
+                {busy ? "Saving…" : effectiveRole === "student" ? "Join class" : "Continue"}
               </Text>
             </TouchableOpacity>
           </View>

@@ -268,7 +268,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   );
 
   const copy = reasonCopy(paywallReason);
-  const priceLabel = monthlyPackage?.product.priceString ?? "$14.99/mo";
+  const priceLabel = monthlyPackage?.product.priceString ?? "$24.99/mo";
 
   return (
     <SubscriptionContext.Provider value={value}>

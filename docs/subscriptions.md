@@ -1,13 +1,14 @@
 # Graider subscriptions (RevenueCat + server limits)
 
-Freemium stack grading with App Store subscriptions via RevenueCat.
+Freemium stack grading with App Store subscriptions via RevenueCat. Web checkout uses the same entitlement — see [`graider/docs/subscriptions.md`](../../graider/docs/subscriptions.md).
 
 ## Tiers
 
 | Tier | Price | Limits |
 |------|-------|--------|
 | Free | $0 | 1 owned class, 20 completed stack grades / calendar month |
-| Pro | App Store IAP | Unlimited classes + stack grades |
+| Pro monthly | **$24.99 / month** | Unlimited classes + stack grades |
+| Pro annual | **$240 / year** | Same |
 
 Pre-auth onboarding sample grade is **not** gated.
 
@@ -15,10 +16,13 @@ Pre-auth onboarding sample grade is **not** gated.
 
 1. Create a RevenueCat project and iOS app (`com.davidtapestry.graider-mobile`).
 2. Create entitlement identifier: **`pro`**
-3. Create App Store subscription product (e.g. `graider_pro_monthly`) and attach to `pro`.
-4. Create a **current offering** with a monthly package.
+3. Create App Store subscription products:
+   - `graider_pro_monthly` ($24.99/mo)
+   - `graider_pro_annual` ($240/yr)
+   Attach both to `pro`.
+4. Create a **current offering** with `$rc_monthly` and `$rc_annual` packages.
 5. Configure webhook:
-   - URL: `https://graider.vercel.app/api/webhooks/revenuecat`
+   - URL: `https://<your-host>/api/webhooks/revenuecat`
    - Authorization: `Bearer <REVENUECAT_WEBHOOK_AUTH>` (same value as Vercel env)
 6. Use Clerk `userId` as RevenueCat `app_user_id` (mobile calls `Purchases.logIn(userId)`).
 
@@ -32,6 +36,7 @@ Pre-auth onboarding sample grade is **not** gated.
 
 - `REVENUECAT_SECRET_API_KEY` — secret key for subscriber API lookups
 - `REVENUECAT_WEBHOOK_AUTH` — bearer token for webhook auth
+- `NEXT_PUBLIC_REVENUECAT_WEB_API_KEY` — Web Billing public key for web checkout
 
 ## API
 

@@ -1,20 +1,25 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { View, Text, TouchableOpacity, TextInput } from "react-native";
 
 import { Card, btnPrimary, btnSecondary, inputClass } from "@/components/shared/ui";
 import { resolveMcqChoices } from "@/lib/mcq-choices";
 import type { TestDetail } from "@/lib/types";
 
+type SaveStatus = "idle" | "saving" | "saved" | "error";
+
 type TestTakingFormProps = {
   test: TestDetail;
   answers: Record<string, string>;
   onChangeAnswer: (questionId: string, value: string) => void;
+  onSaveDraft: (answers: Record<string, string>) => Promise<void>;
   onSubmit: (opts?: { timedOut?: boolean }) => void | Promise<void>;
   onClose: () => void;
   isBusy: boolean;
   deadlineAt: string | null;
   durationMinutes: number | null;
 };
+
+const AUTOSAVE_MS = 800;
 
 function formatRemaining(ms: number): string {
   if (ms <= 0) return "0:00";
@@ -31,6 +36,7 @@ export default function TestTakingForm({
   test,
   answers,
   onChangeAnswer,
+  onSaveDraft,
   onSubmit,
   onClose,
   isBusy,
@@ -46,7 +52,55 @@ export default function TestTakingForm({
   }, [deadlineAt]);
 
   const [now, setNow] = useState(() => Date.now());
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const timedOutFiredRef = useRef(false);
+  const answersRef = useRef(answers);
+  const dirtyRef = useRef(false);
+  const savingRef = useRef(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onSaveDraftRef = useRef(onSaveDraft);
+
+  answersRef.current = answers;
+  onSaveDraftRef.current = onSaveDraft;
+
+  const flushSave = useCallback(async () => {
+    if (timerRef.current != null) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    if (!dirtyRef.current || savingRef.current) return;
+    dirtyRef.current = false;
+    savingRef.current = true;
+    setSaveStatus("saving");
+    try {
+      await onSaveDraftRef.current(answersRef.current);
+      setSaveStatus("saved");
+    } catch {
+      dirtyRef.current = true;
+      setSaveStatus("error");
+    } finally {
+      savingRef.current = false;
+      if (dirtyRef.current && timerRef.current == null) {
+        timerRef.current = setTimeout(() => {
+          void flushSave();
+        }, AUTOSAVE_MS);
+      }
+    }
+  }, []);
+
+  const scheduleSave = useCallback(() => {
+    dirtyRef.current = true;
+    if (timerRef.current != null) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
+      void flushSave();
+    }, AUTOSAVE_MS);
+  }, [flushSave]);
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current != null) clearTimeout(timerRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     if (!deadlineMs) return;
@@ -62,11 +116,33 @@ export default function TestTakingForm({
     if (timedOutFiredRef.current) return;
     if (isBusy) return;
     timedOutFiredRef.current = true;
-    void onSubmit({ timedOut: true });
-  }, [remainingMs, isBusy, onSubmit]);
+    void (async () => {
+      await flushSave();
+      await onSubmit({ timedOut: true });
+    })();
+  }, [remainingMs, isBusy, onSubmit, flushSave]);
+
+  async function handleExit() {
+    await flushSave();
+    onClose();
+  }
+
+  function handleChange(questionId: string, value: string) {
+    onChangeAnswer(questionId, value);
+    scheduleSave();
+  }
 
   const isCritical = remainingMs !== null && remainingMs <= 60_000;
   const isWarning = remainingMs !== null && remainingMs <= 5 * 60_000 && remainingMs > 60_000;
+
+  const saveLabel =
+    saveStatus === "saving"
+      ? "Saving…"
+      : saveStatus === "saved"
+        ? "Saved"
+        : saveStatus === "error"
+          ? "Save failed"
+          : null;
 
   return (
     <View className="mb-6">
@@ -92,9 +168,18 @@ export default function TestTakingForm({
             {durationMinutes && durationMinutes > 0 ? (
               <Text className="mt-0.5 text-xs text-ink-faint">{durationMinutes} min limit</Text>
             ) : null}
+            {saveLabel ? (
+              <Text
+                className={`mt-1 text-xs font-semibold ${
+                  saveStatus === "error" ? "text-pen-deep" : "text-ink-faint"
+                }`}
+              >
+                {saveLabel}
+              </Text>
+            ) : null}
           </View>
           <TouchableOpacity
-            onPress={onClose}
+            onPress={() => void handleExit()}
             className="rounded-2xl border border-line bg-paper px-3 py-2"
           >
             <Text className="text-sm font-medium text-ink-soft">Exit</Text>
@@ -107,6 +192,7 @@ export default function TestTakingForm({
         <Text className="mt-0.5 text-xl font-bold text-ink">{test.title}</Text>
         <Text className="mt-1 text-sm text-ink-faint">
           {test.questions.length} question{test.questions.length !== 1 ? "s" : ""} · {totalMarks} marks
+          · Auto-saves
         </Text>
       </View>
 
@@ -133,7 +219,7 @@ export default function TestTakingForm({
                     return (
                       <TouchableOpacity
                         key={choice.key}
-                        onPress={() => onChangeAnswer(q.question_id, choice.key)}
+                        onPress={() => handleChange(q.question_id, choice.key)}
                         className={`flex-row items-start gap-3 rounded-xl border px-3 py-3 ${
                           selected ? "border-pen bg-pen-wash" : "border-line bg-paper"
                         }`}
@@ -160,7 +246,7 @@ export default function TestTakingForm({
                   multiline
                   className={`${inputClass} mt-4 min-h-[120px]`}
                   value={answers[q.question_id] ?? ""}
-                  onChangeText={(text) => onChangeAnswer(q.question_id, text)}
+                  onChangeText={(text) => handleChange(q.question_id, text)}
                   placeholder="Type your answer here…"
                   textAlignVertical="top"
                 />
@@ -172,15 +258,20 @@ export default function TestTakingForm({
         <View className="mt-4 flex-row gap-3 rounded-2xl border border-line bg-paper p-3">
           <TouchableOpacity
             className={`${btnPrimary} flex-1 justify-center py-3`}
-            onPress={() => void onSubmit()}
+            onPress={() =>
+              void (async () => {
+                await flushSave();
+                await onSubmit();
+              })()
+            }
             disabled={isBusy}
           >
             <Text className="text-center font-semibold text-white">
               {isBusy ? "Submitting…" : "Submit test"}
             </Text>
           </TouchableOpacity>
-          <TouchableOpacity className={btnSecondary} onPress={onClose}>
-            <Text className="font-medium text-pen-deep">Cancel</Text>
+          <TouchableOpacity className={btnSecondary} onPress={() => void handleExit()}>
+            <Text className="font-medium text-pen-deep">Exit</Text>
           </TouchableOpacity>
         </View>
       </View>

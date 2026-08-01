@@ -290,6 +290,7 @@ export default function StudentDashboard() {
         started_at: string | null;
         deadline_at: string | null;
         duration_minutes: number | null;
+        answers?: Array<{ question_id: string; answer: string }>;
       }>(
         await graiderFetch("/api/submissions/start", {
           method: "POST",
@@ -313,12 +314,32 @@ export default function StudentDashboard() {
       });
       const initial: Record<string, string> = {};
       for (const q of payload.test.questions) initial[q.question_id] = "";
+      for (const row of started.answers ?? []) {
+        if (row.question_id in initial) {
+          initial[row.question_id] = row.answer ?? "";
+        }
+      }
       setTestTakingAnswers(initial);
       setSelectedClassId(payload.test.class_id);
     } catch (error) {
       if (error instanceof Error) setStatus(error.message, "error");
       await loadDashboard();
     }
+  }
+
+  async function saveDraft(answers: Record<string, string>) {
+    if (!activeAttempt?.attempt_id) return;
+    const payload = Object.entries(answers).map(([question_id, answer]) => ({
+      question_id,
+      answer,
+    }));
+    await handleJson(
+      await graiderFetch(`/api/submissions/${activeAttempt.attempt_id}/draft`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ answers: payload }),
+      }),
+    );
   }
 
   async function openAttemptDetail(attemptId: string) {
@@ -378,6 +399,7 @@ export default function StudentDashboard() {
     return (
       <ProfileSetup
         initialRole={profileFormRole}
+        lockedRole="student"
         onComplete={async ({ full_name, role: nextRole }) => {
           if (nextRole === "teacher") {
             router.replace("/(teacher)");
@@ -411,6 +433,7 @@ export default function StudentDashboard() {
                 test={selectedTest}
                 answers={testTakingAnswers}
                 onChangeAnswer={(qid, value) => setTestTakingAnswers((c) => ({ ...c, [qid]: value }))}
+                onSaveDraft={saveDraft}
                 onSubmit={submitTest}
                 onClose={() => {
                   setSelectedTest(null);

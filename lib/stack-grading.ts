@@ -380,7 +380,11 @@ export async function commitStack(params: {
 
     // Idempotent attempt creation: same pattern as teacher-attempt.
     const [existing] = await db
-      .select({ id: testAttempts.id })
+      .select({
+        id: testAttempts.id,
+        source: testAttempts.source,
+        submittedAt: testAttempts.submittedAt,
+      })
       .from(testAttempts)
       .where(
         and(eq(testAttempts.testId, testId), eq(testAttempts.studentId, studentId)),
@@ -391,6 +395,16 @@ export async function commitStack(params: {
     let created: boolean;
 
     if (existing) {
+      if (existing.source === "student") {
+        if (!existing.submittedAt) {
+          throw new Error(
+            "This student still has an in-progress digital attempt. Wait for them to submit, or clear that attempt before grading a paper stack.",
+          );
+        }
+        throw new Error(
+          "This student already submitted digitally. Stack OCR cannot overwrite a digital submission.",
+        );
+      }
       attemptId = existing.id;
       created = false;
     } else {

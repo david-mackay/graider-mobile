@@ -74,6 +74,28 @@ export default function TeacherDashboard() {
     }
   }
 
+  async function loadScopedData(classId: string) {
+    if (!classId) {
+      setQuestions([]);
+      setClassMembers([]);
+      return;
+    }
+    try {
+      const [qRes, mRes] = await Promise.all([
+        handleJson<{ questions: DashboardQuestion[] }>(
+          await graiderFetch(`/api/questions?classId=${classId}`, { cache: "no-store" }),
+        ),
+        handleJson<{ members: ClassMember[] }>(
+          await graiderFetch(`/api/classes/${classId}/members`, { cache: "no-store" }),
+        ),
+      ]);
+      setQuestions(qRes.questions ?? []);
+      setClassMembers(mRes.members ?? []);
+    } catch (error) {
+      if (error instanceof Error) setStatus(error.message, "error");
+    }
+  }
+
   async function loadDashboard() {
     if (loadInFlightRef.current) return;
     loadInFlightRef.current = true;
@@ -122,24 +144,12 @@ export default function TeacherDashboard() {
         if (nextSelectedClassId !== ALL_CLASSES_VALUE) {
           await setStoredClassId(nextSelectedClassId);
         }
+        // Scoped data loads via the selectedClassId effect.
         return;
       }
 
       const scopedClassId = nextSelectedClassId !== ALL_CLASSES_VALUE ? nextSelectedClassId : "";
-      if (scopedClassId) {
-        const qRes = await handleJson<{ questions: DashboardQuestion[] }>(
-          await graiderFetch(`/api/questions?classId=${scopedClassId}`, { cache: "no-store" }),
-        );
-        setQuestions(qRes.questions ?? []);
-
-        const mRes = await handleJson<{ members: ClassMember[] }>(
-          await graiderFetch(`/api/classes/${scopedClassId}/members`, { cache: "no-store" }),
-        );
-        setClassMembers(mRes.members ?? []);
-      } else {
-        setQuestions([]);
-        setClassMembers([]);
-      }
+      await loadScopedData(scopedClassId);
     } catch (error) {
       if (error instanceof Error) setStatus(error.message, "error");
     } finally {
@@ -150,7 +160,15 @@ export default function TeacherDashboard() {
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
     void loadDashboard();
-  }, [isLoaded, isSignedIn, selectedClassId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoaded, isSignedIn]);
+
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn) return;
+    const scopedId = selectedClassId !== ALL_CLASSES_VALUE ? selectedClassId : "";
+    void loadScopedData(scopedId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedClassId]);
 
   function navigate(view: ActiveView) {
     setActiveView(view);
@@ -192,6 +210,7 @@ export default function TeacherDashboard() {
     return (
       <ProfileSetup
         initialRole={profileFormRole}
+        lockedRole="teacher"
         onComplete={async ({ full_name, role: nextRole }) => {
           if (nextRole === "student") {
             router.replace("/(student)");

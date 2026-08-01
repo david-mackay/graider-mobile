@@ -1,4 +1,5 @@
 import { gradeQuestion } from "@/lib/openrouter";
+import { gradeMcqExact } from "@/lib/mcq";
 import { db } from "@/lib/db";
 import { testAttempts, testQuestions, questionBank, attemptAnswers } from "@/drizzle/schema";
 import { eq, asc } from "drizzle-orm";
@@ -10,13 +11,37 @@ export type GradeAttemptResult = {
   grades: Array<{ question_id: string; marks_earned: number; feedback: string }>;
 };
 
+export class AttemptNotSubmittedError extends Error {
+  constructor() {
+    super("This attempt is still in progress and cannot be graded yet.");
+    this.name = "AttemptNotSubmittedError";
+  }
+}
+
 export async function gradeOneAttempt(attemptId: string, testId: string): Promise<GradeAttemptResult> {
+  const [attempt] = await db
+    .select({
+      id: testAttempts.id,
+      submittedAt: testAttempts.submittedAt,
+    })
+    .from(testAttempts)
+    .where(eq(testAttempts.id, attemptId))
+    .limit(1);
+
+  if (!attempt) {
+    throw new Error("Attempt not found.");
+  }
+  if (!attempt.submittedAt) {
+    throw new AttemptNotSubmittedError();
+  }
+
   const tqRows = await db
     .select({
       questionId: testQuestions.questionId,
       prompt: questionBank.prompt,
       correctAnswer: questionBank.correctAnswer,
       marks: questionBank.marks,
+      questionType: questionBank.questionType,
     })
     .from(testQuestions)
     .innerJoin(questionBank, eq(testQuestions.questionId, questionBank.id))
@@ -36,7 +61,12 @@ export async function gradeOneAttempt(attemptId: string, testId: string): Promis
     answerRows.map((answer) => [answer.questionId, answer]),
   );
 
-  const gradeRows: { id: string; marksEarned: number; feedback: string }[] = [];
+  const gradeRows: {
+    id: string;
+    marksEarned: number;
+    feedback: string;
+    gradedBy: "exact" | "ai";
+  }[] = [];
   const graded: Array<{ question_id: string; marks_earned: number; feedback: string }> = [];
   let earnedTotal = 0;
   let maxTotal = 0;
@@ -44,13 +74,20 @@ export async function gradeOneAttempt(attemptId: string, testId: string): Promis
   for (const question of tqRows) {
     const answer = answerByQuestion.get(question.questionId);
     const studentAnswer = answer?.studentAnswer ?? "";
+    const isMcq = question.questionType === "mcq";
 
-    const grade = await gradeQuestion({
-      question: question.prompt,
-      marks: question.marks,
-      teacher_answer: question.correctAnswer,
-      student_answer: studentAnswer,
-    });
+    const grade = isMcq
+      ? gradeMcqExact({
+          teacherAnswer: question.correctAnswer,
+          studentAnswer,
+          marks: question.marks,
+        })
+      : await gradeQuestion({
+          question: question.prompt,
+          marks: question.marks,
+          teacher_answer: question.correctAnswer,
+          student_answer: studentAnswer,
+        });
 
     maxTotal += question.marks;
     earnedTotal += grade.marks_earned;
@@ -60,6 +97,7 @@ export async function gradeOneAttempt(attemptId: string, testId: string): Promis
         id: answer.id,
         marksEarned: grade.marks_earned,
         feedback: grade.feedback,
+        gradedBy: isMcq ? "exact" : "ai",
       });
     }
 
@@ -76,6 +114,8 @@ export async function gradeOneAttempt(attemptId: string, testId: string): Promis
       .set({
         marksEarned: row.marksEarned,
         feedback: row.feedback,
+        gradedBy: row.gradedBy,
+        updatedAt: new Date(),
       })
       .where(eq(attemptAnswers.id, row.id));
   }

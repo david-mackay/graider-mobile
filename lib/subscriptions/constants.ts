@@ -1,7 +1,12 @@
 export const REVENUECAT_ENTITLEMENT_PRO = "pro";
 
-/** Monthly Pro subscription product identifier in App Store Connect / RevenueCat. */
+/** Monthly / annual Pro product identifiers in App Store Connect / RevenueCat. */
 export const PRO_MONTHLY_PRODUCT_ID = "graider_pro_monthly";
+export const PRO_ANNUAL_PRODUCT_ID = "graider_pro_annual";
+
+/** Display fallbacks when store price strings are not loaded yet. */
+export const PRO_MONTHLY_PRICE_LABEL = "$24.99/mo";
+export const PRO_ANNUAL_PRICE_LABEL = "$240/yr";
 
 export const FREE_TIER_MONTHLY_GRADE_LIMIT = 20;
 export const FREE_TIER_CLASS_LIMIT = 1;
