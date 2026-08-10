@@ -1,6 +1,7 @@
-import { View, Text, Pressable } from "react-native";
+import { View, Text, Pressable, Alert } from "react-native";
 import { useState } from "react";
-import { ChevronRight, Pencil, Users } from "lucide-react-native";
+import { useAuth } from "@clerk/clerk-expo";
+import { ChevronRight, Pencil, Trash2, Users } from "lucide-react-native";
 import {
   Badge,
   Card,
@@ -12,7 +13,7 @@ import {
 } from "@/components/shared/ui";
 import FormSheet from "@/components/shared/FormSheet";
 import { IconHome } from "@/components/shared/icons";
-import { handleJson, GraiderApiError } from "@/lib/dashboard-client";
+import { ALL_CLASSES_VALUE, handleJson, GraiderApiError } from "@/lib/dashboard-client";
 import { useGraiderFetch } from "@/lib/graider-fetch";
 import { useSubscription } from "@/components/subscriptions/SubscriptionProvider";
 import type { DashboardClass, DashboardTest, Invitation } from "@/lib/dashboard-types";
@@ -45,6 +46,7 @@ export default function TeacherClassesView({
   setBusy,
 }: TeacherClassesViewProps) {
   const graiderFetch = useGraiderFetch();
+  const { userId } = useAuth();
   const { showPaywall } = useSubscription();
 
   // Create
@@ -124,6 +126,45 @@ export default function TeacherClassesView({
     }
   }
 
+  function confirmDeleteClass(entry: DashboardClass) {
+    const studentCount = entry.student_count ?? 0;
+    Alert.alert(
+      "Delete class?",
+      `Delete "${entry.name}"? This permanently removes the class, its roster, tests, and related data.${
+        studentCount > 0
+          ? ` ${studentCount} student${studentCount !== 1 ? "s" : ""} will be removed from the class.`
+          : ""
+      }`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => void deleteClass(entry),
+        },
+      ],
+    );
+  }
+
+  async function deleteClass(entry: DashboardClass) {
+    setBusy(true);
+    try {
+      await handleJson(
+        await graiderFetch(`/api/classes/${entry.id}`, { method: "DELETE" }),
+      );
+      if (selectedClassId === entry.id) {
+        const next = classes.find((c) => c.id !== entry.id);
+        onSelectClass(next?.id ?? ALL_CLASSES_VALUE);
+      }
+      onStatus(`Class "${entry.name}" deleted.`);
+      await onCreated();
+    } catch (error) {
+      if (error instanceof Error) onStatus(error.message, "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function loadInvitations(classId: string) {
     try {
       const payload = await handleJson<{ invitations: Invitation[] }>(
@@ -148,7 +189,7 @@ export default function TeacherClassesView({
     <View className="gap-5">
       <SectionHeader
         title="Classes"
-        subtitle="Switch your active class, then add students from the Students tab."
+        subtitle="Rename or delete classes you own. Add students from the Students tab."
         action={
           <Pressable className={btnPrimary} onPress={openCreateModal}>
             <Text className="font-bold text-white">+ New</Text>
@@ -182,11 +223,13 @@ export default function TeacherClassesView({
             const classTests = tests.filter((t) => t.class_id === entry.id);
             const gradedCount = attemptsGradedCountByClass.get(entry.id) ?? 0;
             const isActive = entry.id === selectedClassId;
+            const isOwner = Boolean(userId && entry.owner_user_id === userId);
             const invitesExpanded = expandedInvitesClassId === entry.id;
             const invitations = invitationsByClass.get(entry.id) ?? [];
             const activeInviteCount = invitations.filter(
               (inv) => inv.status !== "accepted" && (!inv.expires_at || new Date(inv.expires_at) >= new Date()),
             ).length;
+            const iconColor = isActive ? "#99291f" : "#a3927b";
 
             return (
               <View
@@ -213,11 +256,21 @@ export default function TeacherClassesView({
                     </Text>
                   </Pressable>
                   <View className="flex-row items-center gap-3 pt-0.5">
-                    <Pressable hitSlop={8} onPress={() => openRenameModal(entry)}>
-                      <Pencil size={14} color={isActive ? "#99291f" : "#a3927b"} />
+                    <Pressable hitSlop={8} onPress={() => openRenameModal(entry)} accessibilityLabel="Rename class">
+                      <Pencil size={14} color={iconColor} />
                     </Pressable>
+                    {isOwner ? (
+                      <Pressable
+                        hitSlop={8}
+                        disabled={isBusy}
+                        onPress={() => confirmDeleteClass(entry)}
+                        accessibilityLabel="Delete class"
+                      >
+                        <Trash2 size={14} color={iconColor} />
+                      </Pressable>
+                    ) : null}
                     <Pressable hitSlop={4} onPress={() => onOpenClass(entry.id)}>
-                      <ChevronRight size={20} color={isActive ? "#99291f" : "#a3927b"} />
+                      <ChevronRight size={20} color={iconColor} />
                     </Pressable>
                   </View>
                 </View>
