@@ -1,4 +1,5 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import 'react-native-gesture-handler';
 import {
   Fraunces_400Regular,
   Fraunces_600SemiBold,
@@ -16,7 +17,8 @@ import {
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { Text, View, StyleSheet } from 'react-native';
 import 'react-native-reanimated';
 import { configureReanimatedLogger, ReanimatedLogLevel } from 'react-native-reanimated';
 
@@ -46,19 +48,20 @@ export const unstable_settings = {
   initialRouteName: 'index',
 };
 
-// Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
-const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!;
+const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY?.trim() ?? '';
+const clerkKeyKind = publishableKey.startsWith('pk_live_')
+  ? 'live'
+  : publishableKey.startsWith('pk_test_')
+    ? 'test'
+    : 'missing';
 
-if (!publishableKey) {
-  throw new Error(
-    'Missing Publishable Key. Please set EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY in your .env',
-  )
-}
+/** After this, show a diagnostic instead of an endless cream/white hang. */
+const CLERK_LOAD_TIMEOUT_MS = 12_000;
 
 export default function RootLayout() {
-  const [loaded, error] = useFonts({
+  const [loaded, fontError] = useFonts({
     Fraunces_400Regular,
     Fraunces_600SemiBold,
     Fraunces_700Bold,
@@ -68,27 +71,57 @@ export default function RootLayout() {
     Caveat_400Regular,
     Caveat_700Bold,
   });
-
-  // Expo Router uses Error Boundaries to catch errors in the navigation tree.
-  useEffect(() => {
-    if (error) throw error;
-  }, [error]);
+  const [clerkTimedOut, setClerkTimedOut] = useState(false);
 
   useEffect(() => {
-    if (loaded) {
-      SplashScreen.hideAsync();
+    if (loaded || fontError) {
+      void SplashScreen.hideAsync();
     }
+  }, [loaded, fontError]);
+
+  // Always hide splash eventually so we never sit on a blank system splash.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      void SplashScreen.hideAsync();
+    }, 8_000);
+    return () => clearTimeout(t);
+  }, []);
+
+  useEffect(() => {
+    if (!loaded || !publishableKey) return;
+    const t = setTimeout(() => setClerkTimedOut(true), CLERK_LOAD_TIMEOUT_MS);
+    return () => clearTimeout(t);
   }, [loaded]);
 
+  if (fontError) {
+    return (
+      <View style={styles.errorRoot}>
+        <Text style={styles.errorTitle}>Couldn’t load fonts</Text>
+        <Text style={styles.errorBody}>{String(fontError.message ?? fontError)}</Text>
+      </View>
+    );
+  }
+
   if (!loaded) {
-    return <AppLoadingScreen />;
+    return <AppLoadingScreen message="Loading fonts…" />;
+  }
+
+  if (!publishableKey) {
+    return (
+      <AppLoadingScreen message="Missing EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY in this build." />
+    );
   }
 
   return (
     <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
-      {/* ClerkLoaded used to render nothing until ready → TestFlight looked blank. */}
       <ClerkLoading>
-        <AppLoadingScreen />
+        <AppLoadingScreen
+          message={
+            clerkTimedOut
+              ? `Clerk is taking too long (key: ${clerkKeyKind}). In Clerk Production → Native applications, add bundle id com.davidtapestry.graider-mobile and Team ID 9UHCNK7769. Also confirm clerk.graider.org DNS.`
+              : 'Starting sign-in…'
+          }
+        />
       </ClerkLoading>
       <ClerkLoaded>
         <AppUpdatesProvider>
@@ -120,3 +153,24 @@ function RootLayoutNav() {
     </ThemeProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  errorRoot: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f6efe1',
+    padding: 24,
+  },
+  errorTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#99291f',
+    marginBottom: 8,
+  },
+  errorBody: {
+    fontSize: 13,
+    color: '#6f6151',
+    textAlign: 'center',
+  },
+});
