@@ -1,5 +1,7 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import 'react-native-gesture-handler';
+import '../global.css';
+
+import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import {
   Fraunces_400Regular,
   Fraunces_600SemiBold,
@@ -28,8 +30,6 @@ configureReanimatedLogger({
 });
 import { ClerkProvider, ClerkLoaded, ClerkLoading } from '@clerk/clerk-expo';
 import { tokenCache } from '../cache';
-
-import '../global.css';
 
 import { useColorScheme } from '@/components/useColorScheme';
 import { SubscriptionProvider } from '@/components/subscriptions/SubscriptionProvider';
