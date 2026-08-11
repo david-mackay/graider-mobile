@@ -45,9 +45,13 @@ export default function ServiceHealthProvider({ children }: { children: React.Re
   }, [refresh]);
 
   return (
-    <View className="flex-1">
+    <View style={styles.root}>
       {children}
       <ServiceHealthBanner report={report} fetchError={fetchError} />
     </View>
   );
 }
+
+const styles = {
+  root: { flex: 1 as const },
+};

@@ -22,7 +22,7 @@ const SERVICE_LABELS: Record<HealthServiceName, string> = {
 };
 
 const HEALTH_PATH = "/api/health";
-const FETCH_TIMEOUT_MS = 8_000;
+const FETCH_TIMEOUT_MS = 15_000;
 
 export const SERVICE_HEALTH_POLL_MS = 45_000;
 
