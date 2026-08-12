@@ -17,6 +17,9 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.davidtapestry.graider-mobile",
       "usesAppleSignIn": true,
+      "entitlements": {
+        "com.apple.developer.applesignin": ["Default"]
+      },
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSCameraUsageDescription": "Graider needs camera access to photograph handwritten paper stacks for grading.",
