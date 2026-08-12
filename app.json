@@ -16,6 +16,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.davidtapestry.graider-mobile",
+      "usesAppleSignIn": true,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSCameraUsageDescription": "Graider needs camera access to photograph handwritten paper stacks for grading.",
@@ -54,6 +55,7 @@
       "expo-router",
       "expo-secure-store",
       "expo-updates",
+      "expo-apple-authentication",
       [
         "expo-notifications",
         {

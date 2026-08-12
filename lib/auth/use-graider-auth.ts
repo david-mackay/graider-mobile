@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
-import { useOAuth, useSignIn, useSignUp } from "@clerk/clerk-expo";
+import { Platform } from "react-native";
+import { useOAuth, useSignIn, useSignInWithApple, useSignUp } from "@clerk/clerk-expo";
 import { useRouter, type Href } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 
@@ -27,14 +28,25 @@ function clerkErrorMessage(err: unknown): string {
   return "Something went wrong. Try again.";
 }
 
+function isAppleCancelError(err: unknown): boolean {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    "code" in err &&
+    (err as { code?: string }).code === "ERR_REQUEST_CANCELED"
+  );
+}
+
 /**
  * Email + Google + Apple auth for onboarding / landing.
- * Google/Apple use OAuth; email uses password sign-up (with email code verify) or sign-in.
+ * Google uses browser OAuth. Apple uses native Sign in with Apple on iOS
+ * (so the system sheet shows "Graider") and browser OAuth on Android.
  */
 export function useGraiderAuth({ redirectTo = "/(teacher)", onStarted }: UseGraiderAuthOptions = {}) {
   const router = useRouter();
   const google = useOAuth({ strategy: "oauth_google" });
-  const apple = useOAuth({ strategy: "oauth_apple" });
+  const appleOAuth = useOAuth({ strategy: "oauth_apple" });
+  const { startAppleAuthenticationFlow } = useSignInWithApple();
   const { signIn, setActive: setActiveSignIn, isLoaded: signInLoaded } = useSignIn();
   const { signUp, setActive: setActiveSignUp, isLoaded: signUpLoaded } = useSignUp();
 
@@ -56,28 +68,53 @@ export function useGraiderAuth({ redirectTo = "/(teacher)", onStarted }: UseGrai
     [redirectTo, router],
   );
 
-  const continueWithOAuth = useCallback(
-    async (provider: AuthOAuthProvider) => {
-      onStarted?.();
-      setError(null);
-      setIsBusy(true);
-      try {
-        const start = provider === "google" ? google.startOAuthFlow : apple.startOAuthFlow;
-        const { createdSessionId, setActive } = await start();
+  const continueWithGoogle = useCallback(async () => {
+    onStarted?.();
+    setError(null);
+    setIsBusy(true);
+    try {
+      const { createdSessionId, setActive } = await google.startOAuthFlow();
+      const ok = await finish(createdSessionId, setActive);
+      if (!ok) {
+        setError("Could not finish signing in. Try again.");
+      }
+    } catch (err) {
+      console.error("[auth] google OAuth error", err);
+      setError(clerkErrorMessage(err));
+      throw err;
+    } finally {
+      setIsBusy(false);
+    }
+  }, [finish, google.startOAuthFlow, onStarted]);
+
+  const continueWithApple = useCallback(async () => {
+    onStarted?.();
+    setError(null);
+    setIsBusy(true);
+    try {
+      if (Platform.OS === "ios") {
+        const { createdSessionId, setActive } = await startAppleAuthenticationFlow();
         const ok = await finish(createdSessionId, setActive);
         if (!ok) {
           setError("Could not finish signing in. Try again.");
         }
-      } catch (err) {
-        console.error(`[auth] ${provider} OAuth error`, err);
-        setError(clerkErrorMessage(err));
-        throw err;
-      } finally {
-        setIsBusy(false);
+        return;
       }
-    },
-    [apple.startOAuthFlow, finish, google.startOAuthFlow, onStarted],
-  );
+
+      const { createdSessionId, setActive } = await appleOAuth.startOAuthFlow();
+      const ok = await finish(createdSessionId, setActive);
+      if (!ok) {
+        setError("Could not finish signing in. Try again.");
+      }
+    } catch (err) {
+      if (isAppleCancelError(err)) return;
+      console.error("[auth] apple sign-in error", err);
+      setError(clerkErrorMessage(err));
+      throw err;
+    } finally {
+      setIsBusy(false);
+    }
+  }, [appleOAuth.startOAuthFlow, finish, onStarted, startAppleAuthenticationFlow]);
 
   const signUpWithEmail = useCallback(
     async (email: string, password: string) => {
@@ -154,8 +191,8 @@ export function useGraiderAuth({ redirectTo = "/(teacher)", onStarted }: UseGrai
     setError,
     pendingEmail,
     clearEmailPending,
-    continueWithGoogle: () => continueWithOAuth("google"),
-    continueWithApple: () => continueWithOAuth("apple"),
+    continueWithGoogle,
+    continueWithApple,
     signUpWithEmail,
     signInWithEmail,
     verifyEmailCode,
