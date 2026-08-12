@@ -8,7 +8,7 @@ Freemium stack grading with App Store subscriptions via RevenueCat. Web checkout
 |------|-------|--------|
 | Free | $0 | 1 owned class, 20 completed stack grades / calendar month |
 | Pro monthly | **$24.99 / month** | Unlimited classes + stack grades |
-| Pro annual | **$240 / year** | Same |
+| Pro annual | **$239.99 / year** | Same |
 
 Pre-auth onboarding sample grade is **not** gated.
 
@@ -18,7 +18,7 @@ Pre-auth onboarding sample grade is **not** gated.
 2. Create entitlement identifier: **`pro`**
 3. Create App Store subscription products:
    - `graider_pro_monthly` ($24.99/mo)
-   - `graider_pro_annual` ($240/yr)
+   - `graider_pro_annual` ($239.99/yr)
    Attach both to `pro`.
 4. Create a **current offering** with `$rc_monthly` and `$rc_annual` packages.
 5. Configure webhook:
