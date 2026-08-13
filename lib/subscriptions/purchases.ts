@@ -5,7 +5,12 @@ import Purchases, {
   type PurchasesOfferings,
   type PurchasesPackage,
 } from "react-native-purchases";
-import { REVENUECAT_ENTITLEMENT_PRO } from "@/lib/subscriptions/constants";
+import {
+  PRO_ANNUAL_PRODUCT_ID,
+  PRO_MONTHLY_PRODUCT_ID,
+  REVENUECAT_ENTITLEMENT_PRO,
+  type SubscriptionPlanId,
+} from "@/lib/subscriptions/constants";
 
 let configured = false;
 
@@ -57,18 +62,47 @@ export async function getOfferings(): Promise<PurchasesOfferings | null> {
   return Purchases.getOfferings();
 }
 
-export function pickMonthlyPackage(
+function productIdOf(pkg: PurchasesPackage): string {
+  return pkg.product?.identifier ?? "";
+}
+
+export function pickPackageForPlan(
   offerings: PurchasesOfferings | null,
+  planId: SubscriptionPlanId,
 ): PurchasesPackage | null {
   const current = offerings?.current;
   if (!current) return null;
 
-  const monthly =
-    current.monthly ??
-    current.availablePackages.find((pkg) => pkg.packageType === "MONTHLY") ??
-    current.availablePackages[0];
+  if (planId === "annual") {
+    return (
+      current.annual ??
+      current.availablePackages.find(
+        (pkg) =>
+          pkg.packageType === "ANNUAL" ||
+          productIdOf(pkg) === PRO_ANNUAL_PRODUCT_ID ||
+          /annual|yearly/i.test(productIdOf(pkg)),
+      ) ??
+      null
+    );
+  }
 
-  return monthly ?? null;
+  return (
+    current.monthly ??
+    current.availablePackages.find(
+      (pkg) =>
+        pkg.packageType === "MONTHLY" ||
+        productIdOf(pkg) === PRO_MONTHLY_PRODUCT_ID ||
+        /monthly/i.test(productIdOf(pkg)),
+    ) ??
+    current.availablePackages[0] ??
+    null
+  );
+}
+
+export function pickMonthlyPackage(
+  offerings: PurchasesOfferings | null,
+): PurchasesPackage | null {
+  return pickPackageForPlan(offerings, "monthly");
 }
 
 export async function purchasePackage(pkg: PurchasesPackage): Promise<CustomerInfo> {

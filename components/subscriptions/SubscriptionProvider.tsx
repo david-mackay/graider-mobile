@@ -15,7 +15,11 @@ import { useGraiderFetch } from "@/lib/graider-fetch";
 import type { SubscriptionSummary } from "@/lib/types";
 import {
   FREE_TIER_MONTHLY_GRADE_LIMIT,
+  PRO_ANNUAL_PRICE_LABEL,
+  PRO_ANNUAL_SAVINGS_LABEL,
+  PRO_MONTHLY_PRICE_LABEL,
   type PaywallReason,
+  type SubscriptionPlanId,
 } from "@/lib/subscriptions/constants";
 import {
   configurePurchases,
@@ -24,17 +28,18 @@ import {
   isPurchasesAvailable,
   loginPurchases,
   logoutPurchases,
-  pickMonthlyPackage,
+  pickPackageForPlan,
   purchasePackage,
   restorePurchases,
 } from "@/lib/subscriptions/purchases";
-import { btnPrimary, btnSecondary, Card } from "@/components/shared/ui";
+import { Badge, btnPrimary, btnSecondary, Card } from "@/components/shared/ui";
 
 type SubscriptionContextValue = {
   subscription: SubscriptionSummary | null;
   loading: boolean;
   packageLoading: boolean;
   monthlyPackage: PurchasesPackage | null;
+  annualPackage: PurchasesPackage | null;
   refreshSubscription: () => Promise<void>;
   canGradeStack: boolean;
   showPaywall: (reason?: PaywallReason) => void;
@@ -90,6 +95,8 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(false);
   const [packageLoading, setPackageLoading] = useState(false);
   const [monthlyPackage, setMonthlyPackage] = useState<PurchasesPackage | null>(null);
+  const [annualPackage, setAnnualPackage] = useState<PurchasesPackage | null>(null);
+  const [selectedPlan, setSelectedPlan] = useState<SubscriptionPlanId>("annual");
   const [paywallVisible, setPaywallVisible] = useState(false);
   const [paywallReason, setPaywallReason] = useState<PaywallReason>("grade_limit");
   const [purchaseBusy, setPurchaseBusy] = useState(false);
@@ -153,7 +160,13 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     (async () => {
       try {
         const offerings = await getOfferings();
-        if (!cancelled) setMonthlyPackage(pickMonthlyPackage(offerings));
+        if (cancelled) return;
+        const monthly = pickPackageForPlan(offerings, "monthly");
+        const annual = pickPackageForPlan(offerings, "annual");
+        setMonthlyPackage(monthly);
+        setAnnualPackage(annual);
+        if (annual) setSelectedPlan("annual");
+        else if (monthly) setSelectedPlan("monthly");
       } finally {
         if (!cancelled) setPackageLoading(false);
       }
@@ -182,11 +195,14 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         setPurchaseError("In-app purchases require a TestFlight or App Store build.");
         return false;
       }
-      let pkg = monthlyPackage;
+      let pkg = selectedPlan === "annual" ? annualPackage : monthlyPackage;
       if (!pkg) {
         const offerings = await getOfferings();
-        pkg = pickMonthlyPackage(offerings);
-        setMonthlyPackage(pkg);
+        const monthly = pickPackageForPlan(offerings, "monthly");
+        const annual = pickPackageForPlan(offerings, "annual");
+        setMonthlyPackage(monthly);
+        setAnnualPackage(annual);
+        pkg = selectedPlan === "annual" ? annual : monthly;
       }
       if (!pkg) {
         setPurchaseError("Pro subscription is not available yet. Check RevenueCat setup.");
@@ -205,7 +221,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     } finally {
       setPurchaseBusy(false);
     }
-  }, [hidePaywall, monthlyPackage, syncAfterPurchase]);
+  }, [annualPackage, hidePaywall, monthlyPackage, selectedPlan, syncAfterPurchase]);
 
   const restorePro = useCallback(async () => {
     setPurchaseBusy(true);
@@ -242,6 +258,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       loading,
       packageLoading,
       monthlyPackage,
+      annualPackage,
       refreshSubscription,
       canGradeStack,
       showPaywall,
@@ -256,6 +273,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       loading,
       packageLoading,
       monthlyPackage,
+      annualPackage,
       refreshSubscription,
       canGradeStack,
       showPaywall,
@@ -268,7 +286,11 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   );
 
   const copy = reasonCopy(paywallReason);
-  const priceLabel = monthlyPackage?.product.priceString ?? "$24.99/mo";
+  const selectedPackage = selectedPlan === "annual" ? annualPackage : monthlyPackage;
+  const priceLabel =
+    selectedPackage?.product.priceString ??
+    (selectedPlan === "annual" ? PRO_ANNUAL_PRICE_LABEL : PRO_MONTHLY_PRICE_LABEL);
+  const selectedAvailable = Boolean(selectedPackage);
 
   return (
     <SubscriptionContext.Provider value={value}>
@@ -316,17 +338,61 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
                 </View>
               ) : null}
 
+              <View className="mt-5 flex-row gap-3">
+                {(
+                  [
+                    {
+                      id: "monthly" as const,
+                      label: "Monthly",
+                      interval: "per month",
+                      pkg: monthlyPackage,
+                      fallback: PRO_MONTHLY_PRICE_LABEL,
+                    },
+                    {
+                      id: "annual" as const,
+                      label: "Annual",
+                      interval: "per year",
+                      pkg: annualPackage,
+                      fallback: PRO_ANNUAL_PRICE_LABEL,
+                      badge: PRO_ANNUAL_SAVINGS_LABEL,
+                    },
+                  ] as const
+                ).map((plan) => {
+                  const available = Boolean(plan.pkg) || packageLoading;
+                  const selected = selectedPlan === plan.id;
+                  return (
+                    <TouchableOpacity
+                      key={plan.id}
+                      onPress={() => setSelectedPlan(plan.id)}
+                      disabled={purchaseBusy || packageLoading || (!plan.pkg && !packageLoading)}
+                      className={`flex-1 rounded-2xl border px-3 py-4 ${
+                        selected ? "border-pen bg-pen-wash/40" : "border-line bg-cream"
+                      } ${!available && !packageLoading ? "opacity-50" : ""}`}
+                    >
+                      <View className="flex-row items-center justify-between gap-1">
+                        <Text className="text-sm font-bold text-ink">{plan.label}</Text>
+                        {"badge" in plan && plan.badge ? <Badge variant="green">{plan.badge}</Badge> : null}
+                      </View>
+                      <Text className="mt-2 text-xl font-bold text-ink">
+                        {plan.pkg?.product.priceString ?? plan.fallback}
+                      </Text>
+                      <Text className="mt-1 text-xs text-ink-faint">{plan.interval}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
               <View className="mt-6 gap-3">
                 <TouchableOpacity
                   onPress={() => void purchasePro()}
-                  disabled={purchaseBusy || packageLoading}
+                  disabled={purchaseBusy || packageLoading || !selectedAvailable}
                   className={`${btnPrimary} items-center py-4`}
                 >
                   {purchaseBusy || packageLoading ? (
                     <ActivityIndicator color="#fff" />
                   ) : (
                     <Text className="text-base font-semibold text-white">
-                      Start Pro · {priceLabel}
+                      Start {selectedPlan === "annual" ? "annual" : "monthly"} Pro · {priceLabel}
                     </Text>
                   )}
                 </TouchableOpacity>

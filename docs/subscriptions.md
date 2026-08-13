@@ -51,7 +51,7 @@ Grade-stack preview/commit and class creation return **402** with `{ code: "GRAD
 ## Mobile integration
 
 - `SubscriptionProvider` wraps the app (inside Clerk).
-- Paywall modal: cream/paper/red-pen styling, purchase + restore.
+- Paywall modal: cream/paper/red-pen styling, monthly + annual, purchase + restore.
 - Gates: before stack upload, after first successful grade (soft upsell), class creation limit.
 
 Real IAP requires a **development or production EAS build** — not Expo Go.
