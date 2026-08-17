@@ -7,7 +7,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { Modal, View, Text, TouchableOpacity, ActivityIndicator, ScrollView } from "react-native";
+import { Modal, View, Text, TouchableOpacity, ActivityIndicator, ScrollView, Linking } from "react-native";
 import { useAuth } from "@clerk/clerk-expo";
 import type { PurchasesPackage } from "react-native-purchases";
 import { handleJson } from "@/lib/dashboard-client";
@@ -33,6 +33,11 @@ import {
   restorePurchases,
 } from "@/lib/subscriptions/purchases";
 import { Badge, btnPrimary, btnSecondary, Card } from "@/components/shared/ui";
+
+const MARKETING_BASE =
+  process.env.EXPO_PUBLIC_APP_URL?.replace(/\/$/, "") || "https://graider.vercel.app";
+const PRIVACY_URL = `${MARKETING_BASE}/privacy`;
+const TERMS_URL = `${MARKETING_BASE}/terms`;
 
 type SubscriptionContextValue = {
   subscription: SubscriptionSummary | null;
@@ -404,6 +409,17 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
                 >
                   <Text className="text-sm font-medium text-pen-deep">Restore purchases</Text>
                 </TouchableOpacity>
+
+                <Text className="text-center text-xs leading-relaxed text-ink-faint">
+                  Subscriptions auto-renew until cancelled in Settings.{" "}
+                  <Text className="font-semibold text-pen" onPress={() => void Linking.openURL(PRIVACY_URL)}>
+                    Privacy Policy
+                  </Text>
+                  {" · "}
+                  <Text className="font-semibold text-pen" onPress={() => void Linking.openURL(TERMS_URL)}>
+                    Terms of Use
+                  </Text>
+                </Text>
 
                 <TouchableOpacity onPress={hidePaywall} disabled={purchaseBusy} className="items-center py-2">
                   <Text className="text-sm text-ink-faint">Not now</Text>
