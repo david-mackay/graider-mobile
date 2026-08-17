@@ -46,15 +46,13 @@ const SURFACES: Record<ContentImportKind, ParseSurface> = {
   test: "test_import",
 };
 
-const LABELS: Record<ContentImportKind, { title: string; hint: string; success: string }> = {
+const LABELS: Record<ContentImportKind, { title: string; success: string }> = {
   question_bank: {
     title: "Import from PDF",
-    hint: "Upload a question bank or answer-key PDF — including MCQ letter keys. You can start another upload while one is processing.",
     success: "Question bank imported.",
   },
   test: {
     title: "Import test from PDF",
-    hint: "Upload a test PDF — we'll create a test and link matching questions. Uploads can run in parallel.",
     success: "Test imported from PDF.",
   },
 };
@@ -164,7 +162,6 @@ export default function PdfImportPanel({
   return (
     <Card className="border-dashed border-line bg-cream/30">
       <Text className="text-sm font-semibold text-ink">{labels.title}</Text>
-      <Text className="mt-1 text-xs leading-relaxed text-ink-faint">{labels.hint}</Text>
       <View className="mt-3">
         <ParsePresetPicker
           surface={surface}

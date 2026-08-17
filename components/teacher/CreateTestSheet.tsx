@@ -20,7 +20,6 @@ type CreateTestSheetProps = {
 export default function CreateTestSheet({
   visible,
   classId,
-  className,
   onClose,
   onCreated,
   onStatus,
@@ -120,7 +119,6 @@ export default function CreateTestSheet({
     <FormSheet
       visible={visible}
       title="Create test"
-      subtitle={`${className} — pick questions or import a PDF`}
       onClose={() => {
         reset();
         onClose();

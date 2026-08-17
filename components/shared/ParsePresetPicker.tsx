@@ -17,8 +17,6 @@ export default function ParsePresetPicker({
   onChange,
   disabled = false,
 }: ParsePresetPickerProps) {
-  const selected = PARSE_PRESET_OPTIONS.find((o) => o.id === value) ?? PARSE_PRESET_OPTIONS[0];
-
   return (
     <View className="gap-2">
       <Text className="text-xs font-bold uppercase tracking-wide text-ink-faint">Document type</Text>
@@ -41,7 +39,6 @@ export default function ParsePresetPicker({
           );
         })}
       </View>
-      <Text className="text-xs leading-relaxed text-ink-faint">{selected?.hint}</Text>
     </View>
   );
 }

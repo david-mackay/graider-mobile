@@ -14,10 +14,17 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ChevronLeft, X } from "lucide-react-native";
+import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
 import { useCallback, useRef, useState } from "react";
 import { Card } from "@/components/shared/ui";
-import { assetToPickedImage, isAcceptedImageType, pickedImageKey, type PickedImage } from "@/lib/picked-image";
+import {
+  assetToPickedImage,
+  isAcceptedImageType,
+  isPdfPage,
+  pickedImageKey,
+  type PickedImage,
+} from "@/lib/picked-image";
 import { MAX_PAGES_PER_STUDENT } from "@/lib/student-grade";
 
 const THUMB_W = 148;
@@ -50,7 +57,7 @@ function acceptedPages(assets: ImagePicker.ImagePickerAsset[]): PickedImage[] {
     }
   }
   if (pages.length === 0) {
-    Alert.alert("Unsupported format", "Use JPG, PNG, or HEIC photos.");
+    Alert.alert("Unsupported format", "Use JPG, PNG, HEIC, or PDF.");
     return [];
   }
   if (rejected.length > 0) {
@@ -100,6 +107,42 @@ async function pickPhotosFromLibrary(maxCount: number): Promise<PickedImage[]> {
 
   if (result.canceled || result.assets.length === 0) return [];
   return acceptedPages(result.assets).slice(0, maxCount);
+}
+
+async function pickPdfs(maxCount: number): Promise<PickedImage[]> {
+  if (maxCount <= 0) {
+    Alert.alert("Page limit", `Maximum ${MAX_PAGES_PER_STUDENT} pages per student.`);
+    return [];
+  }
+
+  const result = await DocumentPicker.getDocumentAsync({
+    type: "application/pdf",
+    copyToCacheDirectory: true,
+    multiple: maxCount > 1,
+  });
+  if (result.canceled || !result.assets?.length) return [];
+
+  const pages: PickedImage[] = [];
+  const rejected: string[] = [];
+  for (const asset of result.assets) {
+    const picked = assetToPickedImage(asset);
+    if (isAcceptedImageType(picked) && isPdfPage(picked)) {
+      pages.push(picked);
+    } else {
+      rejected.push(picked.name);
+    }
+  }
+  if (pages.length === 0) {
+    Alert.alert("Unsupported format", "Use a PDF file.");
+    return [];
+  }
+  if (rejected.length > 0) {
+    Alert.alert(
+      "Some files skipped",
+      `${rejected.length} file${rejected.length === 1 ? "" : "s"} had an unsupported format.`,
+    );
+  }
+  return pages.slice(0, maxCount);
 }
 
 type PageThumbProps = {
@@ -253,11 +296,44 @@ function PageThumb({
         elevation: isDragging ? 8 : 2,
       }}
     >
-      <Image
-        source={{ uri: page.uri }}
-        style={{ width: THUMB_W, height: THUMB_H }}
-        resizeMode="cover"
-      />
+      {isPdfPage(page) ? (
+        <View
+          style={{
+            width: THUMB_W,
+            height: THUMB_H,
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: "#f7f3eb",
+            paddingHorizontal: 12,
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: "#be3a2e",
+              borderRadius: 6,
+              paddingHorizontal: 8,
+              paddingVertical: 3,
+              marginBottom: 8,
+            }}
+          >
+            <Text style={{ color: "white", fontSize: 10, fontWeight: "800", letterSpacing: 0.8 }}>
+              PDF
+            </Text>
+          </View>
+          <Text
+            numberOfLines={3}
+            style={{ textAlign: "center", fontSize: 11, fontWeight: "600", color: "#6f6151" }}
+          >
+            {page.name}
+          </Text>
+        </View>
+      ) : (
+        <Image
+          source={{ uri: page.uri }}
+          style={{ width: THUMB_W, height: THUMB_H }}
+          resizeMode="cover"
+        />
+      )}
 
       {/* Page number badge */}
       <View
@@ -368,6 +444,13 @@ export default function StepCapturePages({
     }
   }, [onAddPage, remainingSlots]);
 
+  const handlePdf = useCallback(async () => {
+    const picked = await pickPdfs(remainingSlots);
+    for (const page of picked) {
+      onAddPage(page);
+    }
+  }, [onAddPage, remainingSlots]);
+
   const handlePressIn = useCallback(() => {
     setScrollLocked(true);
   }, []);
@@ -431,7 +514,7 @@ export default function StepCapturePages({
         <Card className="mb-4 flex-1 items-center justify-center border-dashed border-pen/30 bg-pen-wash/20 py-16">
           <Text className="text-lg font-semibold text-ink">Add page 1</Text>
           <Text className="mt-2 px-6 text-center text-sm text-ink-soft">
-            Snap with your camera or upload photos you&apos;ve already taken. Name on page 1 only is fine.
+            Snap with your camera, upload photos, or add a PDF. Name on page 1 only is fine.
           </Text>
         </Card>
       ) : (
@@ -485,17 +568,30 @@ export default function StepCapturePages({
           </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          onPress={() => void handleUpload()}
-          disabled={remainingSlots <= 0}
-          className="items-center rounded-full border-2 border-line bg-paper py-4 disabled:opacity-50"
-          accessibilityRole="button"
-          accessibilityLabel={pages.length === 0 ? "Upload first page" : "Upload more pages"}
-        >
-          <Text className="text-base font-bold text-pen-deep">
-            {pages.length === 0 ? "Upload from photos" : "Upload more pages"}
-          </Text>
-        </TouchableOpacity>
+        <View className="flex-row gap-3">
+          <TouchableOpacity
+            onPress={() => void handleUpload()}
+            disabled={remainingSlots <= 0}
+            className="flex-1 items-center rounded-full border-2 border-line bg-paper py-4 disabled:opacity-50"
+            accessibilityRole="button"
+            accessibilityLabel={pages.length === 0 ? "Upload first page from photos" : "Upload more photos"}
+          >
+            <Text className="text-base font-bold text-pen-deep">
+              {pages.length === 0 ? "Upload photos" : "More photos"}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => void handlePdf()}
+            disabled={remainingSlots <= 0}
+            className="flex-1 items-center rounded-full border-2 border-line bg-paper py-4 disabled:opacity-50"
+            accessibilityRole="button"
+            accessibilityLabel={pages.length === 0 ? "Upload PDF" : "Add PDF"}
+          >
+            <Text className="text-base font-bold text-pen-deep">
+              {pages.length === 0 ? "Upload PDF" : "Add PDF"}
+            </Text>
+          </TouchableOpacity>
+        </View>
 
         {pages.length > 0 ? (
           <TouchableOpacity
@@ -549,7 +645,26 @@ export default function StepCapturePages({
             </Text>
           </View>
 
-          {previewPage ? (
+          {previewPage && isPdfPage(previewPage) ? (
+            <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 32 }}>
+              <View
+                style={{
+                  backgroundColor: "#be3a2e",
+                  borderRadius: 8,
+                  paddingHorizontal: 12,
+                  paddingVertical: 4,
+                  marginBottom: 12,
+                }}
+              >
+                <Text style={{ color: "white", fontSize: 12, fontWeight: "800", letterSpacing: 1 }}>
+                  PDF
+                </Text>
+              </View>
+              <Text style={{ color: "white", fontSize: 16, fontWeight: "600", textAlign: "center" }}>
+                {previewPage.name}
+              </Text>
+            </View>
+          ) : previewPage ? (
             <Image source={{ uri: previewPage.uri }} style={{ flex: 1 }} resizeMode="contain" />
           ) : null}
 

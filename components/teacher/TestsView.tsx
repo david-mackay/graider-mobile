@@ -180,7 +180,6 @@ export default function TestsView({
       <FormSheet
         visible={createModalOpen}
         title="Create test"
-        subtitle="Pick questions manually or import a test PDF."
         onClose={() => {
           setCreateModalOpen(false);
           setTestTitle("");
