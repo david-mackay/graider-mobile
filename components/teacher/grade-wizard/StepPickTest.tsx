@@ -23,7 +23,7 @@ type GroupedTests = {
   tests: TestSummary[];
 };
 
-export default function StepPickTest({ onSelect, onSelectAutoGrade, showSmartGrade = true }: StepPickTestProps) {
+export default function StepPickTest({ onSelect, onSelectAutoGrade, showSmartGrade = false }: StepPickTestProps) {
   const router = useRouter();
   const graiderFetch = useGraiderFetch();
   const [tests, setTests] = useState<TestSummary[]>([]);
@@ -182,7 +182,7 @@ export default function StepPickTest({ onSelect, onSelectAutoGrade, showSmartGra
             </View>
             <Text className="text-base font-bold text-ink">No tests yet</Text>
             <Text className="text-center text-sm text-ink-soft">
-              Create a test for your class, or use Smart grade above to detect one from your papers.
+              Create a test for your class, then come back to grade papers.
             </Text>
             {teacherClasses[0] ? (
               <Pressable

@@ -19,6 +19,7 @@ export default function MarketingLayout() {
 
   return (
     <Stack screenOptions={{ headerShown: false, animation: "slide_from_right" }}>
+      <Stack.Screen name="index" />
       <Stack.Screen name="onboarding/hook" />
       <Stack.Screen name="onboarding/capabilities" />
       <Stack.Screen name="onboarding/answer-key" />

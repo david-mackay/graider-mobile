@@ -259,7 +259,7 @@ export default function StudentsView({
               <Card className="items-center py-8">
                 <Text className="text-sm text-ink-soft">No students yet.</Text>
                 <Text className="mt-1 text-center text-xs text-ink-faint">
-                  Add names and emails — Graider uses them when matching stack photos.
+                  Add names and emails to build your roster.
                 </Text>
                 <Pressable className={`${btnSecondaryBlock} mt-4 px-5`} onPress={openAddModal}>
                   <Text className="text-sm font-medium text-pen-deep">Add your first student</Text>

@@ -72,8 +72,8 @@ function reasonCopy(reason: PaywallReason): { title: string; subtitle: string } 
       };
     case "soft_upsell":
       return {
-        title: "Love grading stacks?",
-        subtitle: "Pro unlocks unlimited stack grading so Sunday's pile never waits.",
+        title: "Love saving time?",
+        subtitle: "Pro unlocks unlimited grading so Sunday's pile never waits.",
       };
     case "auto_grade":
       return {
@@ -82,8 +82,8 @@ function reasonCopy(reason: PaywallReason): { title: string; subtitle: string } 
       };
     default:
       return {
-        title: "Unlock unlimited stack grading",
-        subtitle: "You've used your free stack grades this month. Pro keeps the red pen moving.",
+        title: "Unlock unlimited grading",
+        subtitle: "You've used your free tests this month. Pro keeps the marking moving.",
       };
   }
 }
@@ -315,9 +315,9 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
                 <Text className="text-sm font-semibold text-ink">Pro includes</Text>
                 <View className="mt-3 gap-2">
                   {[
-                    "Unlimited stack grading every month",
+                    "Unlimited tests graded every month",
                     "Unlimited classes",
-                    "Same warm paper-stack workflow you already use",
+                    "The same workflow you already use",
                   ].map((line) => (
                     <Text key={line} className="text-sm text-ink-soft">
                       • {line}
@@ -328,7 +328,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
 
               {subscription && !subscription.isPro ? (
                 <Text className="mt-4 text-center text-xs text-ink-faint">
-                  {subscription.gradesUsedThisMonth} of {subscription.gradeLimit ?? FREE_TIER_MONTHLY_GRADE_LIMIT} free stack grades used this month
+                  {subscription.gradesUsedThisMonth} of {subscription.gradeLimit ?? FREE_TIER_MONTHLY_GRADE_LIMIT} tests graded this month
                 </Text>
               ) : null}
 

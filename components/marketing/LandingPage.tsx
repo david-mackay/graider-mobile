@@ -45,12 +45,12 @@ const STEPS = [
   {
     n: "02",
     title: "Grade against your rubric",
-    note: "your standards, not AI vibes",
-    desc: "Marks and feedback come from the key and rubric you provide. This is not an LLM freestyling opinions about student work.",
+    note: "your standards, not a chatbot",
+    desc: "Marks and feedback come from the key and rubric you provide — not a chatbot's opinion of the work.",
   },
   {
     n: "03",
-    title: "Snap the stack",
+    title: "Photograph the papers",
     note: "camera or photo library",
     desc: "Photograph the pile. Graider matches pages to students on your roster. You confirm once, then it grades the lot.",
   },
@@ -75,10 +75,10 @@ export default function LandingPage() {
             For teachers who grade by hand
           </Text>
           <Text className="mt-4 text-center font-display text-5xl font-semibold leading-tight tracking-tight text-ink">
-            The stack grades itself.
+            The papers grade themselves.
           </Text>
           <Text className="mt-6 max-w-md text-center text-lg leading-relaxed text-ink-soft">
-            Upload your test and answer key, photograph the stack, and get marks against{" "}
+            Upload your test and answer key, photograph the papers, and get marks against{" "}
             <Text className="font-semibold text-ink">your</Text> rubric — then hand back a PDF or
             email with feedback you control.
           </Text>
@@ -121,7 +121,7 @@ export default function LandingPage() {
             How it works
           </Text>
           <Text className="mt-4 text-center font-display text-3xl font-semibold tracking-tight text-ink">
-            Your key. Your stack. Their marked papers — tonight.
+            Your key. Their papers — marked tonight.
           </Text>
           <Text className="mx-auto mt-4 max-w-xl text-center text-base leading-relaxed text-ink-soft">
             Built for teachers who already know how they want work marked, and just need the Sunday pile gone.
@@ -142,7 +142,7 @@ export default function LandingPage() {
 
         <View className="bg-ink px-6 py-16">
           <Text className="text-center font-hand text-2xl text-gold">
-            Sunday evening, 7pm. A stack of 28 papers.
+            Sunday evening, 7pm. 28 papers on the desk.
           </Text>
           <Text className="mt-4 text-center font-display text-4xl font-semibold tracking-tight text-paper">
             Done before your coffee is.

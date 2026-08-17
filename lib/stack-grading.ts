@@ -398,7 +398,7 @@ export async function commitStack(params: {
       if (existing.source === "student") {
         if (!existing.submittedAt) {
           throw new Error(
-            "This student still has an in-progress digital attempt. Wait for them to submit, or clear that attempt before grading a paper stack.",
+            "This student still has an in-progress digital attempt. Wait for them to submit, or clear that attempt before grading their paper.",
           );
         }
         throw new Error(

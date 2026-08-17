@@ -42,7 +42,7 @@ export default function TeacherSidebar({
           className="group flex w-full items-center gap-2 rounded-full bg-pen px-3 py-2.5 text-sm font-semibold text-white shadow-paper transition-colors duration-150 hover:bg-pen-deep active:bg-pen-deep"
         >
           <IconSparkle className="h-4 w-4 flex-shrink-0" />
-          <Text>Grade a stack</Text>
+          <Text>Grade papers</Text>
         </Link>
       </View>
       <View className="p-4 border-b border-line/60">

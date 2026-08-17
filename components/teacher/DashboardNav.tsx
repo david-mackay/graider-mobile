@@ -131,7 +131,7 @@ export function TeacherBottomNav({
         <Link href="/(teacher)/grade" asChild>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Grade stack"
+            accessibilityLabel="Grade papers"
             className="-mt-7 mx-2 h-[58px] w-[58px] items-center justify-center rounded-full border-4 border-paper bg-pen shadow-paper"
           >
             <IconPen className="h-7 w-7 text-white" />

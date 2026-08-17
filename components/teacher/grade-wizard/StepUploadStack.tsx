@@ -121,10 +121,10 @@ export default function StepUploadStack({
       <Card className="border-line bg-cream/40">
         <View className="items-center">
           <Text className="rounded-full bg-pen px-3 py-1 text-xs font-semibold text-white">
-            Batch Scan Mode
+            Class set
           </Text>
           <Text className="mt-3 text-center text-sm text-ink-soft">
-            Capture the full stack for each student, then review matches before grading.
+            Photograph the class set, then review matches before grading.
           </Text>
         </View>
       </Card>
@@ -151,10 +151,10 @@ export default function StepUploadStack({
 
         <View className="items-center justify-center rounded-xl border-2 border-dashed border-line bg-pen-wash/30 px-6 py-8">
           <Text className="text-sm font-semibold text-ink">
-            Snap or upload stack photos
+            Photograph or upload the papers
           </Text>
           <Text className="mt-1 text-xs text-ink-soft">
-            JPG, PNG, or HEIC/HEIF. Up to {MAX_IMAGES} pages per stack.
+            JPG, PNG, or HEIC/HEIF. Up to {MAX_IMAGES} pages.
           </Text>
           <View className="mt-4">
             <ImagePickerButton

@@ -22,8 +22,8 @@
       },
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "NSCameraUsageDescription": "Graider needs camera access to photograph handwritten paper stacks for grading.",
-        "NSPhotoLibraryUsageDescription": "Graider needs photo library access to upload stack photos for grading."
+        "NSCameraUsageDescription": "Graider needs camera access to photograph handwritten papers for grading.",
+        "NSPhotoLibraryUsageDescription": "Graider needs photo library access to upload photos of papers for grading."
       }
     },
     "android": {
@@ -78,8 +78,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Graider needs photo library access to upload stack photos for grading.",
-          "cameraPermission": "Graider needs camera access to photograph handwritten paper stacks for grading."
+          "photosPermission": "Graider needs photo library access to upload photos of papers for grading.",
+          "cameraPermission": "Graider needs camera access to photograph handwritten papers for grading."
         }
       ]
     ],

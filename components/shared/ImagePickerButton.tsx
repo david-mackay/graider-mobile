@@ -17,7 +17,7 @@ async function requestLibraryPermission(): Promise<boolean> {
   if (status !== "granted") {
     Alert.alert(
       "Photo access needed",
-      "Allow photo library access in Settings to upload stack photos.",
+      "Allow photo library access in Settings to upload photos of papers.",
     );
     return false;
   }
@@ -29,7 +29,7 @@ async function requestCameraPermission(): Promise<boolean> {
   if (status !== "granted") {
     Alert.alert(
       "Camera access needed",
-      "Allow camera access in Settings to photograph your paper stack.",
+      "Allow camera access in Settings to photograph papers.",
     );
     return false;
   }

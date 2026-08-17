@@ -202,7 +202,7 @@ export function useStackGrade(): UseStackGradeReturn {
         setAssignments(buildInitialAssignments(nextPreview));
         setState("reviewing");
       } catch (error) {
-        const rawMessage = error instanceof Error ? error.message : "Failed to preview stack.";
+        const rawMessage = error instanceof Error ? error.message : "Failed to preview these papers.";
         if (error instanceof GraiderApiError && error.code) {
           setLimitCode(error.code);
         } else {
@@ -294,7 +294,7 @@ export function useStackGrade(): UseStackGradeReturn {
       setResults({ results: nextResults });
       setState("results");
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to grade stack.";
+      const message = error instanceof Error ? error.message : "Failed to grade these papers.";
       setErrorMessage(message);
       setState("reviewing");
     }

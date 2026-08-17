@@ -155,7 +155,7 @@ export default function StepResults({
         <View className="items-center gap-3 py-10">
           <Text className="text-base font-semibold text-ink">Nothing graded</Text>
           <TouchableOpacity onPress={onRestart} className={btnPrimary}>
-            <Text className="text-sm font-semibold text-white">Grade another session</Text>
+            <Text className="text-sm font-semibold text-white">Grade more papers</Text>
           </TouchableOpacity>
         </View>
       </Card>
@@ -287,7 +287,7 @@ export default function StepResults({
           </TouchableOpacity>
         </Link>
         <TouchableOpacity onPress={onRestart} className={btnPrimary}>
-          <Text className="text-sm font-semibold text-white">Grade another session</Text>
+          <Text className="text-sm font-semibold text-white">Grade more papers</Text>
         </TouchableOpacity>
       </View>
 

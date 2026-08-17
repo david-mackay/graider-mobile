@@ -42,12 +42,7 @@ export default function AccountSettingsView({ backHref }: AccountSettingsViewPro
     setBusy(true);
     try {
       await signOut();
-      // Reset to the marketing landing — teacher/student layouts also
-      // redirect when signed out, but replace("/") is the explicit home.
-      if (router.canDismiss()) {
-        router.dismissAll();
-      }
-      router.replace("/");
+      router.replace("/(marketing)");
     } catch (error) {
       Alert.alert("Sign out failed", error instanceof Error ? error.message : "Try again.");
     } finally {
@@ -62,10 +57,7 @@ export default function AccountSettingsView({ backHref }: AccountSettingsViewPro
         await graiderFetch("/api/me", { method: "DELETE" }),
       );
       await signOut();
-      if (router.canDismiss()) {
-        router.dismissAll();
-      }
-      router.replace("/");
+      router.replace("/(marketing)");
     } catch (error) {
       Alert.alert(
         "Could not delete account",

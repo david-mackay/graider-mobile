@@ -1,13 +1,13 @@
 # Graider subscriptions (RevenueCat + server limits)
 
-Freemium stack grading with App Store subscriptions via RevenueCat. Web checkout uses the same entitlement — see [`graider/docs/subscriptions.md`](../../graider/docs/subscriptions.md).
+Freemium paper grading with App Store subscriptions via RevenueCat. Web checkout uses the same entitlement — see [`graider/docs/subscriptions.md`](../../graider/docs/subscriptions.md).
 
 ## Tiers
 
 | Tier | Price | Limits |
 |------|-------|--------|
-| Free | $0 | 1 owned class, 20 completed stack grades / calendar month |
-| Pro monthly | **$24.99 / month** | Unlimited classes + stack grades |
+| Free | $0 | 1 owned class, 3 tests graded / calendar month |
+| Pro monthly | **$24.99 / month** | Unlimited classes + tests graded |
 | Pro annual | **$239.99 / year** | Same |
 
 Pre-auth onboarding sample grade is **not** gated.
@@ -52,6 +52,6 @@ Grade-stack preview/commit and class creation return **402** with `{ code: "GRAD
 
 - `SubscriptionProvider` wraps the app (inside Clerk).
 - Paywall modal: cream/paper/red-pen styling, monthly + annual, purchase + restore.
-- Gates: before stack upload, after first successful grade (soft upsell), class creation limit.
+- Gates: before paper upload, after first successful grade (soft upsell), class creation limit.
 
 Real IAP requires a **development or production EAS build** — not Expo Go.

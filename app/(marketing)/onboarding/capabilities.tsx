@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { View, Text, TouchableOpacity } from "react-native";
 import { router } from "expo-router";
 import OnboardingShell from "@/components/marketing/OnboardingShell";
+import { Wordmark } from "@/components/shared/Brand";
 import { Sparkles } from "lucide-react-native";
 import { ONBOARDING_EVENTS, fireEvent } from "@/lib/onboarding/funnel-events";
 
@@ -40,7 +41,7 @@ export default function OnboardingCapabilitiesPage() {
           <Sparkles size={32} color="white" />
         </View>
         <Text className="text-center font-display text-3xl font-semibold tracking-tight text-ink">
-          That&apos;s where <Text className="font-bold text-pen">graider</Text> comes in.
+          That&apos;s where <Wordmark className="text-[1em]" /> comes in.
         </Text>
         <Text className="mt-4 text-center text-base leading-relaxed text-ink-soft">
           Bring the test you already wrote. Grade against the key you trust. Hand papers back tonight.

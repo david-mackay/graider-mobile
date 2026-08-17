@@ -10,7 +10,9 @@ export default function TeacherLayout() {
   }
 
   if (!isSignedIn) {
-    return <Redirect href="/" />;
+    // Must be a unique root-stack route. "/" is named "index" in this
+    // nested stack too, so REPLACE index fails once this layout unmounts.
+    return <Redirect href="/(marketing)" />;
   }
 
   return (

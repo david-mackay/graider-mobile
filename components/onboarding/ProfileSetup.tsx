@@ -114,7 +114,7 @@ export default function ProfileSetup({
             </FormField>
             <FormField label="I am a…">
               <View className="flex-row gap-3">
-                {roleOption("teacher", "Teacher", "Grade stacks of papers")}
+                {roleOption("teacher", "Teacher", "I grade tests and exams")}
                 {roleOption("student", "Student", "Take tests")}
               </View>
             </FormField>

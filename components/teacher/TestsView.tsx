@@ -134,10 +134,10 @@ export default function TestsView({
             {pendingTotal} paper{pendingTotal !== 1 ? "s" : ""} waiting to grade
           </Text>
           <Text className="mt-1 text-xs text-ink-soft">
-            Use the Grade stack button below to scan and grade handwritten papers.
+            Use Grade papers below to scan and mark handwritten work.
           </Text>
           <Pressable className={`${btnSecondaryBlock} mt-3 px-5`} onPress={() => router.push("/(teacher)/grade")}>
-            <Text className="text-sm font-medium text-pen-deep">Grade stack</Text>
+            <Text className="text-sm font-medium text-pen-deep">Grade papers</Text>
           </Pressable>
         </Card>
       ) : classId && gradedTotal > 0 ? (
@@ -256,7 +256,7 @@ export default function TestsView({
         <Card className="items-center py-10">
           <Text className="text-sm font-semibold text-ink">No tests yet</Text>
           <Text className="mt-1 text-center text-xs text-ink-faint">
-            Create a test or grade a stack — Smart grade can create one from your papers.
+            Create a test, then grade papers from the red button below.
           </Text>
         </Card>
       ) : null}

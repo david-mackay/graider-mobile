@@ -10,7 +10,7 @@ export default function StudentLayout() {
   }
 
   if (!isSignedIn) {
-    return <Redirect href="/" />;
+    return <Redirect href="/(marketing)" />;
   }
 
   return (

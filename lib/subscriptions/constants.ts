@@ -11,7 +11,7 @@ export const PRO_ANNUAL_SAVINGS_LABEL = "Save ~20%";
 
 export type SubscriptionPlanId = "monthly" | "annual";
 
-export const FREE_TIER_MONTHLY_GRADE_LIMIT = 20;
+export const FREE_TIER_MONTHLY_GRADE_LIMIT = 3;
 export const FREE_TIER_CLASS_LIMIT = 1;
 
 export type PaywallReason = "grade_limit" | "class_limit" | "soft_upsell" | "auto_grade";

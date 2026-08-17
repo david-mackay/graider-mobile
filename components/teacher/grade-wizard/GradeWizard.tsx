@@ -255,7 +255,7 @@ export default function GradeWizard() {
           <StepPickTest
             onSelect={actions.selectTest}
             onSelectAutoGrade={handleSelectAutoGrade}
-            showSmartGrade
+            showSmartGrade={false}
           />
         ) : null}
 
