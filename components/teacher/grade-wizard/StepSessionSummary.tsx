@@ -8,8 +8,7 @@ import { totalPageCount } from "@/lib/student-grade";
 type StepSessionSummaryProps = {
   buckets: StudentBucket[];
   testTitle: string;
-  parsePreset: DocumentParsePreset;
-  onParsePresetChange: (preset: DocumentParsePreset) => void;
+  onParsePresetChange: (preset: DocumentParsePreset, studentId: string) => void;
   onAddStudent: () => void;
   onResumeStudent: (studentId: string) => void;
   onRemoveStudent: (studentId: string) => void;
@@ -22,7 +21,6 @@ type StepSessionSummaryProps = {
 export default function StepSessionSummary({
   buckets,
   testTitle,
-  parsePreset,
   onParsePresetChange,
   onAddStudent,
   onResumeStudent,
@@ -43,15 +41,9 @@ export default function StepSessionSummary({
           {testTitle} · {captured.length} student{captured.length === 1 ? "" : "s"} · {pageTotal} page
           {pageTotal === 1 ? "" : "s"}
         </Text>
-      </Card>
-
-      <Card>
-        <ParsePresetPicker
-          surface="grade_stack"
-          value={parsePreset}
-          onChange={onParsePresetChange}
-          disabled={isBusy}
-        />
+        <Text className="mt-2 text-xs text-ink-faint">
+          Document type is per student. Use handwritten or typed/scan — not circled MCQ.
+        </Text>
       </Card>
 
       {errorMessage ? (
@@ -64,31 +56,41 @@ export default function StepSessionSummary({
         {captured.map((bucket) => (
           <View
             key={bucket.studentId}
-            className="mb-2 flex-row items-center rounded-2xl border border-line bg-paper px-4 py-3"
+            className="mb-2 rounded-2xl border border-line bg-paper px-4 py-3"
           >
-            <TouchableOpacity
-              onPress={() => onResumeStudent(bucket.studentId)}
-              className="flex-1 flex-row items-center"
-            >
-              <View className="mr-3 h-10 w-10 items-center justify-center rounded-full bg-pen-wash">
-                <Text className="text-sm font-bold text-pen-deep">
-                  {bucket.studentName.charAt(0).toUpperCase()}
-                </Text>
-              </View>
-              <View className="flex-1">
-                <Text className="text-base font-semibold text-ink">{bucket.studentName}</Text>
-                <Text className="text-xs text-ink-soft">
-                  {bucket.pages.length} page{bucket.pages.length === 1 ? "" : "s"} · tap to add more
-                </Text>
-              </View>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => onRemoveStudent(bucket.studentId)}
-              disabled={isBusy}
-              className="rounded-full px-3 py-2"
-            >
-              <Text className="text-xs font-medium text-ink-soft">Remove</Text>
-            </TouchableOpacity>
+            <View className="flex-row items-center">
+              <TouchableOpacity
+                onPress={() => onResumeStudent(bucket.studentId)}
+                className="flex-1 flex-row items-center"
+              >
+                <View className="mr-3 h-10 w-10 items-center justify-center rounded-full bg-pen-wash">
+                  <Text className="text-sm font-bold text-pen-deep">
+                    {bucket.studentName.charAt(0).toUpperCase()}
+                  </Text>
+                </View>
+                <View className="flex-1">
+                  <Text className="text-base font-semibold text-ink">{bucket.studentName}</Text>
+                  <Text className="text-xs text-ink-soft">
+                    {bucket.pages.length} page{bucket.pages.length === 1 ? "" : "s"} · tap to add more
+                  </Text>
+                </View>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => onRemoveStudent(bucket.studentId)}
+                disabled={isBusy}
+                className="rounded-full px-3 py-2"
+              >
+                <Text className="text-xs font-medium text-ink-soft">Remove</Text>
+              </TouchableOpacity>
+            </View>
+            <View className="mt-3">
+              <ParsePresetPicker
+                surface="student_ocr"
+                value={bucket.parsePreset}
+                onChange={(preset) => onParsePresetChange(preset, bucket.studentId)}
+                disabled={isBusy}
+              />
+            </View>
           </View>
         ))}
       </ScrollView>

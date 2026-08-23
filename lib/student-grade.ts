@@ -1,4 +1,5 @@
 import type { PickedImage } from "@/lib/picked-image";
+import { defaultPresetForSurface, type DocumentParsePreset } from "@/lib/parse-presets";
 
 export const MAX_PAGES_PER_STUDENT = 15;
 export const MAX_STUDENTS_PER_SESSION = 10;
@@ -8,6 +9,7 @@ export type StudentBucket = {
   studentId: string;
   studentName: string;
   pages: PickedImage[];
+  parsePreset: DocumentParsePreset;
 };
 
 export type FlattenedSession = {

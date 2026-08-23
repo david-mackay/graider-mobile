@@ -18,6 +18,8 @@ import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
 import { useCallback, useRef, useState } from "react";
 import { Card } from "@/components/shared/ui";
+import ParsePresetPicker from "@/components/shared/ParsePresetPicker";
+import type { DocumentParsePreset } from "@/lib/parse-presets";
 import {
   assetToPickedImage,
   isAcceptedImageType,
@@ -41,6 +43,8 @@ type StepCapturePagesProps = {
   onDone: () => void;
   onBack: () => void;
   errorMessage: string;
+  parsePreset: DocumentParsePreset;
+  onParsePresetChange: (preset: DocumentParsePreset) => void;
   /** Override the label on the "Done" button. Defaults to "Done with {studentName}". */
   doneLabel?: string;
 };
@@ -414,6 +418,8 @@ export default function StepCapturePages({
   onDone,
   onBack,
   errorMessage,
+  parsePreset,
+  onParsePresetChange,
   doneLabel,
 }: StepCapturePagesProps) {
   const insets = useSafeAreaInsets();
@@ -507,6 +513,14 @@ export default function StepCapturePages({
         <Text className="text-xs text-ink-faint">
           {pages.length}/{MAX_PAGES_PER_STUDENT}
         </Text>
+      </View>
+
+      <View className="mb-4">
+        <ParsePresetPicker
+          surface="student_ocr"
+          value={parsePreset}
+          onChange={onParsePresetChange}
+        />
       </View>
 
       {/* Page strip or empty state */}

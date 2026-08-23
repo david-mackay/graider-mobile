@@ -447,6 +447,8 @@ export default function OnboardingUploadPage() {
         <StepCapturePages
           studentName={name.trim() || `Student ${students.length + 1}`}
           pages={pendingPages}
+          parsePreset={parsePreset}
+          onParsePresetChange={setParsePreset}
           onAddPage={onAddPage}
           onRemovePage={onRemovePage}
           onMovePage={onMovePage}

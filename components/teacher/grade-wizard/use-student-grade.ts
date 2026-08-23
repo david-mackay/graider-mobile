@@ -69,7 +69,7 @@ export type UseStudentGradeReturn = {
     removeBucket: (studentId: string) => void;
     resumeStudent: (studentId: string) => void;
     startAddStudent: () => void;
-    setParsePreset: (preset: DocumentParsePreset) => void;
+    setParsePreset: (preset: DocumentParsePreset, studentId?: string) => void;
     /** Replace the ocrAnswers for a specific page in the preview. */
     setOcrAnswers: (pageIndex: number, answers: OcrAnswer[]) => void;
     submitSession: () => Promise<void>;
@@ -154,9 +154,17 @@ export function useStudentGrade(): UseStudentGradeReturn {
 
   const isBusy = state === "grading";
 
-  const setParsePreset = useCallback((preset: DocumentParsePreset) => {
+  const setParsePreset = useCallback((preset: DocumentParsePreset, studentId?: string) => {
+    const targetId = studentId ?? activeStudentId;
+    if (targetId) {
+      setBuckets((prev) =>
+        prev.map((bucket) =>
+          bucket.studentId === targetId ? { ...bucket, parsePreset: preset } : bucket,
+        ),
+      );
+    }
     setParsePresetState(preset);
-  }, []);
+  }, [activeStudentId]);
 
   const sessionStudents = useMemo(() => {
     const fromBuckets = buckets
@@ -248,7 +256,7 @@ export function useStudentGrade(): UseStudentGradeReturn {
     setBuckets((prev) => {
       const existing = prev.find((b) => b.studentId === studentId);
       if (existing) return prev;
-      return [...prev, { studentId, studentName, pages: [] }];
+      return [...prev, { studentId, studentName, pages: [], parsePreset: defaultPresetForSurface("grade_stack") }];
     });
     setActiveStudentId(studentId);
     setState("capture");
@@ -366,6 +374,7 @@ export function useStudentGrade(): UseStudentGradeReturn {
     setState("grading");
 
     const { files, pageToStudentId: mapping } = flattenStudentBuckets(nonEmpty);
+    const presetByStudent = new Map(nonEmpty.map((bucket) => [bucket.studentId, bucket.parsePreset]));
     setPageToStudentId(mapping);
 
     try {
@@ -384,11 +393,15 @@ export function useStudentGrade(): UseStudentGradeReturn {
       }
       formData.append("idempotencyKey", idempotencyKey);
       formData.append("gradingMode", "student_first");
-      formData.append("parsePreset", parsePreset);
+      formData.append("parsePreset", nonEmpty[0]?.parsePreset ?? parsePreset);
       formData.append(
         "studentPageAssignments",
         JSON.stringify(
-          Array.from(mapping.entries()).map(([pageIndex, studentId]) => ({ pageIndex, studentId })),
+          Array.from(mapping.entries()).map(([pageIndex, studentId]) => ({
+            pageIndex,
+            studentId,
+            parsePreset: presetByStudent.get(studentId),
+          })),
         ),
       );
       for (const file of files) {

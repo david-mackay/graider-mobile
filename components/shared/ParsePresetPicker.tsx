@@ -1,6 +1,6 @@
 import { Pressable, Text, View } from "react-native";
 import {
-  PARSE_PRESET_OPTIONS,
+  presetsForSurface,
   type DocumentParsePreset,
   type ParseSurface,
 } from "@/lib/parse-presets";
@@ -13,15 +13,17 @@ type ParsePresetPickerProps = {
 };
 
 export default function ParsePresetPicker({
+  surface,
   value,
   onChange,
   disabled = false,
 }: ParsePresetPickerProps) {
+  const options = presetsForSurface(surface);
   return (
     <View className="gap-2">
       <Text className="text-xs font-bold uppercase tracking-wide text-ink-faint">Document type</Text>
       <View className="flex-row flex-wrap gap-2">
-        {PARSE_PRESET_OPTIONS.map((option) => {
+        {options.map((option) => {
           const active = option.id === value;
           return (
             <Pressable
