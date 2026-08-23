@@ -141,6 +141,9 @@ export type OcrAnswer = {
   question: string;
   answer: string;
   question_index?: number | null;
+  parse_confidence?: number | null;
+  extract_confidence?: number | null;
+  needs_review?: boolean;
 };
 
 export type OcrPage = {

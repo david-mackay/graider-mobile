@@ -69,6 +69,15 @@ export default function StepStudentReview({
     () => groups.reduce((sum, g) => sum + g.pages.reduce((s, p) => s + p.ocrAnswers.length, 0), 0),
     [groups],
   );
+  const lowConfidenceCount = useMemo(
+    () =>
+      groups.reduce(
+        (sum, g) =>
+          sum + g.pages.reduce((s, p) => s + p.ocrAnswers.filter((a) => a.needs_review).length, 0),
+        0,
+      ),
+    [groups],
+  );
 
   function toggle(studentId: string) {
     setExpanded((prev) => {
@@ -80,7 +89,9 @@ export default function StepStudentReview({
   }
 
   function updateAnswer(page: StackPagePreview, index: number, patch: Partial<OcrAnswer>) {
-    const next = page.ocrAnswers.map((a, i) => (i === index ? { ...a, ...patch } : a));
+    const next = page.ocrAnswers.map((a, i) =>
+      i === index ? { ...a, ...patch, needs_review: false } : a,
+    );
     onOcrAnswersChange(page.pageIndex, next);
   }
 
@@ -105,6 +116,12 @@ export default function StepStudentReview({
           {groups.length} student{groups.length === 1 ? "" : "s"} · {totalAnswers} answer
           {totalAnswers === 1 ? "" : "s"} detected. Fix any misreads before you grade.
         </Text>
+        {lowConfidenceCount > 0 ? (
+          <Text className="mt-3 rounded-xl border border-marigold/40 bg-marigold-wash/40 px-3 py-2 text-sm text-ink">
+            {lowConfidenceCount} answer{lowConfidenceCount === 1 ? "" : "s"} flagged for low parse
+            confidence. Check those first.
+          </Text>
+        ) : null}
       </Card>
 
       {emptyGroups.length > 0 ? (
@@ -174,19 +191,28 @@ export default function StepStudentReview({
                       page.ocrAnswers.map((answer, idx) => (
                         <View
                           key={`${page.pageIndex}-${idx}`}
-                          className="rounded-lg border border-line bg-paper p-3"
+                          className={`rounded-lg border p-3 ${
+                            answer.needs_review
+                              ? "border-marigold/60 bg-marigold-wash/30"
+                              : "border-line bg-paper"
+                          }`}
                         >
                           <View className="flex-row items-baseline justify-between">
                             <Text className="text-xs font-bold uppercase tracking-widest text-ink-faint">
                               Answer {idx + 1}
                             </Text>
-                            <TouchableOpacity
-                              onPress={() => removeAnswer(page, idx)}
-                              disabled={isBusy}
-                              className="rounded-full px-2 py-1"
-                            >
-                              <Text className="text-xs font-medium text-ink-soft">Remove</Text>
-                            </TouchableOpacity>
+                            <View className="flex-row items-center gap-2">
+                              {answer.needs_review ? (
+                                <Badge variant="yellow">Low confidence</Badge>
+                              ) : null}
+                              <TouchableOpacity
+                                onPress={() => removeAnswer(page, idx)}
+                                disabled={isBusy}
+                                className="rounded-full px-2 py-1"
+                              >
+                                <Text className="text-xs font-medium text-ink-soft">Remove</Text>
+                              </TouchableOpacity>
+                            </View>
                           </View>
 
                           <Text className="mt-3 text-sm font-bold text-ink">Question</Text>
