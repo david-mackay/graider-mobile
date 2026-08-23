@@ -6,6 +6,7 @@ import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { useGraiderFetch } from "@/lib/graider-fetch";
 import { handleJson } from "@/lib/dashboard-client";
 import type { AppRole } from "@/lib/types";
+import { peekPendingGradeJobId } from "@/lib/pending-grade-job";
 
 const ROLE_FETCH_TIMEOUT_MS = 10_000;
 
@@ -65,6 +66,11 @@ export default function RootPage() {
 
   if (role === "student") {
     return <Redirect href="/(student)" />;
+  }
+
+  const pendingJobId = peekPendingGradeJobId();
+  if (pendingJobId) {
+    return <Redirect href={`/(teacher)/grade?jobId=${encodeURIComponent(pendingJobId)}`} />;
   }
 
   return <Redirect href="/(teacher)" />;

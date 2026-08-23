@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { View, Text, ScrollView, TouchableOpacity } from "react-native";
 
-import { Link, useLocalSearchParams, useRouter } from "expo-router";
+import { Link, useLocalSearchParams } from "expo-router";
 import { ChevronLeft } from "lucide-react-native";
 import { Card, SectionHeader, btnSecondary } from "@/components/shared/ui";
 import { IconCheck } from "@/components/shared/icons";
 import { handleJson } from "@/lib/dashboard-client";
 import { useGraiderFetch } from "@/lib/graider-fetch";
+import { firstSearchParam, peekPendingGradeJobId, takePendingGradeJobId } from "@/lib/pending-grade-job";
 import type { RosterEntry } from "@/lib/types";
 import type { GradedAttemptDetail } from "@/lib/dashboard-types";
 import { formatStudentDisplayName } from "@/lib/roster-display";
@@ -51,8 +52,8 @@ function activeStepId(state: StudentGradeState): StepDef["id"] {
 }
 
 export default function GradeWizard() {
-  const router = useRouter();
-  const { jobId } = useLocalSearchParams<{ jobId?: string }>();
+  const params = useLocalSearchParams<{ jobId?: string | string[] }>();
+  const jobId = firstSearchParam(params.jobId) ?? peekPendingGradeJobId() ?? undefined;
   const resumedJobRef = useRef<string | null>(null);
   const graiderFetch = useGraiderFetch();
   const wizard = useStudentGrade();
@@ -84,50 +85,69 @@ export default function GradeWizard() {
   const [rosterLoading, setRosterLoading] = useState(false);
   const [rosterError, setRosterError] = useState("");
   const [rosterClassId, setRosterClassId] = useState<string | null>(null);
+  const [rosterClassName, setRosterClassName] = useState<string | null>(null);
+  const [addingStudent, setAddingStudent] = useState(false);
 
   const activeClassId = selectedTest?.class_id ?? autoClassId;
 
+  const loadRoster = useCallback(
+    async (classId: string) => {
+      setRosterLoading(true);
+      setRosterError("");
+      try {
+        const [rosterPayload, classesPayload] = await Promise.all([
+          handleJson<{ roster: RosterEntry[] }>(
+            await graiderFetch(`/api/classes/${classId}/roster`, { cache: "no-store" }),
+          ),
+          handleJson<{ classes: Array<{ id: string; name: string }> }>(
+            await graiderFetch("/api/classes", { cache: "no-store" }),
+          ),
+        ]);
+        setRoster(rosterPayload.roster ?? []);
+        setRosterClassId(classId);
+        setRosterClassName(
+          classesPayload.classes?.find((cls) => cls.id === classId)?.name ?? autoClassName,
+        );
+      } catch (error) {
+        setRosterError(error instanceof Error ? error.message : "Failed to load roster.");
+      } finally {
+        setRosterLoading(false);
+      }
+    },
+    [autoClassName, graiderFetch],
+  );
+
   useEffect(() => {
-    if (!jobId || typeof jobId !== "string") return;
+    if (!jobId) return;
     if (resumedJobRef.current === jobId) return;
     resumedJobRef.current = jobId;
-    void actions.resumeFromJob(jobId).finally(() => {
-      router.setParams({ jobId: undefined });
-    });
-  }, [jobId, actions, router]);
+    void actions.resumeFromJob(jobId).then(
+      () => {
+        takePendingGradeJobId();
+      },
+      () => {
+        if (resumedJobRef.current === jobId) resumedJobRef.current = null;
+      },
+    );
+  }, [jobId, actions]);
 
   useEffect(() => {
     const classId = activeClassId;
     if (!classId) {
       if (roster.length) setRoster([]);
       if (rosterClassId !== null) setRosterClassId(null);
+      if (rosterClassName !== null) setRosterClassName(null);
       return;
     }
     if (rosterClassId === classId) return;
-
     let cancelled = false;
-    async function load(classId: string) {
-      setRosterLoading(true);
-      setRosterError("");
-      try {
-        const payload = await handleJson<{ roster: RosterEntry[] }>(
-          await graiderFetch(`/api/classes/${classId}/roster`, { cache: "no-store" }),
-        );
-        if (cancelled) return;
-        setRoster(payload.roster ?? []);
-        setRosterClassId(classId);
-      } catch (error) {
-        if (cancelled) return;
-        setRosterError(error instanceof Error ? error.message : "Failed to load roster.");
-      } finally {
-        if (!cancelled) setRosterLoading(false);
-      }
-    }
-    void load(classId);
+    void loadRoster(classId).then(() => {
+      if (cancelled) return;
+    });
     return () => {
       cancelled = true;
     };
-  }, [activeClassId, rosterClassId, roster.length, graiderFetch]);
+  }, [activeClassId, loadRoster, roster.length, rosterClassId, rosterClassName]);
 
   useEffect(() => {
     if (limitCode === "GRADE_LIMIT") {
@@ -164,6 +184,35 @@ export default function GradeWizard() {
         studentName: rosterNameById.get(student.studentId) ?? student.studentName,
       })),
     [studentProgress, rosterNameById],
+  );
+
+  const handleAddStudent = useCallback(
+    async (fullName: string, email: string) => {
+      if (!activeClassId) {
+        throw new Error("Pick a test (and class) before adding a student.");
+      }
+      setAddingStudent(true);
+      try {
+        const payload = await handleJson<{
+          student: { user_id: string; full_name: string | null };
+        }>(
+          await graiderFetch(`/api/classes/${activeClassId}/students`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              full_name: fullName,
+              email: email || undefined,
+            }),
+          }),
+        );
+        const name = payload.student.full_name ?? fullName;
+        actions.selectStudent(payload.student.user_id, name);
+        void loadRoster(activeClassId);
+      } finally {
+        setAddingStudent(false);
+      }
+    },
+    [actions, activeClassId, graiderFetch, loadRoster],
   );
 
   const handleSelectAutoGrade = useCallback(
@@ -285,11 +334,20 @@ export default function GradeWizard() {
             roster={roster}
             rosterLoading={rosterLoading}
             rosterError={rosterError}
+            className={rosterClassName}
             sessionStudentIds={sessionStudentIds}
             onSelect={actions.selectStudent}
             onResume={actions.resumeStudent}
+            onAddStudent={handleAddStudent}
+            addingStudent={addingStudent}
             onBack={actions.back}
           />
+        ) : state === "pickStudent" ? (
+          <Card>
+            <Text className="text-sm text-ink-soft">
+              This test is not linked to a class, so students can’t be added here. Pick a class test, or add the student from the Students tab first.
+            </Text>
+          </Card>
         ) : null}
 
         {state === "capture" && activeStudent ? (

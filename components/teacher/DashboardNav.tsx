@@ -3,6 +3,7 @@ import { Link } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BrandMark, Wordmark } from "@/components/shared/Brand";
 import { IconBook, IconClipboard, IconHome, IconPen, IconUsers } from "@/components/shared/icons";
+import ClassSelector from "@/components/teacher/ClassSelector";
 import { ALL_CLASSES_VALUE } from "@/lib/dashboard-client";
 import type { ActiveView, DashboardClass } from "@/lib/dashboard-types";
 
@@ -45,14 +46,21 @@ export function TeacherTopBar({
   subscriptionLabel,
   onManageSubscription,
   onOpenAccount,
+  classes,
+  selectedClassId,
+  onSelectClass,
 }: {
   activeClassName: string | null;
   profileName: string | null;
   subscriptionLabel?: string | null;
   onManageSubscription?: () => void;
   onOpenAccount?: () => void;
+  classes?: DashboardClass[];
+  selectedClassId?: string;
+  onSelectClass?: (classId: string) => void;
 }) {
   const insets = useSafeAreaInsets();
+  const canSwitchClass = Boolean(classes && selectedClassId && onSelectClass && classes.length > 0);
 
   return (
     <View
@@ -64,7 +72,14 @@ export function TeacherTopBar({
           <BrandMark className="h-8 w-8" />
           <View className="flex-1" style={{ minWidth: 0 }}>
             <Wordmark className="text-lg" />
-            {activeClassName ? (
+            {canSwitchClass ? (
+              <ClassSelector
+                classes={classes!}
+                selectedClassId={selectedClassId!}
+                onSelect={onSelectClass!}
+                variant="header"
+              />
+            ) : activeClassName ? (
               <Text className="text-xs font-bold text-ink-soft" numberOfLines={1}>
                 {activeClassName}
               </Text>

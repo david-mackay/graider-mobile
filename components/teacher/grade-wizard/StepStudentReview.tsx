@@ -4,6 +4,10 @@ import { Badge, Card, GraiderTextInput, btnPrimary, btnSecondary } from "@/compo
 import UploadAssetImage from "@/components/shared/UploadAssetImage";
 import type { OcrAnswer, RosterEntry, StackPagePreview } from "@/lib/types";
 import { duplicateNameCounts, rosterDisplayLabel } from "@/lib/roster-display";
+import {
+  formatPrintedQuestionNumber,
+  parsePrintedQuestionNumber,
+} from "@/lib/question-index";
 
 type StudentReviewGroup = {
   studentId: string;
@@ -185,44 +189,41 @@ export default function StepStudentReview({
                             </TouchableOpacity>
                           </View>
 
-                          <Text className="mt-2 text-xs font-bold text-ink">Question</Text>
+                          <Text className="mt-3 text-sm font-bold text-ink">Question</Text>
                           <GraiderTextInput
-                            className="mt-1"
+                            className="mt-1 min-h-[128px] py-3 text-base leading-6"
+                            style={{ minHeight: 128, fontSize: 16, lineHeight: 24 }}
                             value={answer.question}
                             onChangeText={(text) => updateAnswer(page, idx, { question: text })}
                             placeholder="Question prompt (optional)"
+                            multiline
+                            textAlignVertical="top"
                             editable={!isBusy}
                           />
 
-                          <Text className="mt-2 text-xs font-bold text-ink">Question #</Text>
+                          <Text className="mt-3 text-sm font-bold text-ink">Question #</Text>
                           <GraiderTextInput
-                            className="mt-1"
-                            value={
-                              answer.question_index != null
-                                ? String(answer.question_index + 1)
-                                : ""
+                            className="mt-1 w-24"
+                            value={formatPrintedQuestionNumber(answer.question_index)}
+                            onChangeText={(text) =>
+                              updateAnswer(page, idx, {
+                                question_index: parsePrintedQuestionNumber(text),
+                              })
                             }
-                            onChangeText={(text) => {
-                              const raw = text.trim();
-                              const parsed = raw === "" ? null : Number(raw);
-                              const next =
-                                parsed !== null && Number.isFinite(parsed) && parsed >= 1
-                                  ? parsed - 1
-                                  : null;
-                              updateAnswer(page, idx, { question_index: next });
-                            }}
                             placeholder="e.g. 1"
                             keyboardType="number-pad"
                             editable={!isBusy}
                           />
 
-                          <Text className="mt-2 text-xs font-bold text-ink">Student answer</Text>
+                          <Text className="mt-3 text-sm font-bold text-ink">Student answer</Text>
                           <GraiderTextInput
-                            className="mt-1"
+                            className="mt-1 min-h-[168px] py-3 text-base leading-6"
+                            style={{ minHeight: 168, fontSize: 16, lineHeight: 24 }}
                             value={answer.answer}
                             onChangeText={(text) => updateAnswer(page, idx, { answer: text })}
                             placeholder="Fix any OCR misreads…"
                             multiline
+                            textAlignVertical="top"
                             editable={!isBusy}
                           />
                         </View>

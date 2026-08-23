@@ -8,13 +8,19 @@ type ClassSelectorProps = {
   classes: DashboardClass[];
   selectedClassId: string;
   onSelect: (id: string) => void;
+  variant?: "field" | "header";
 };
 
-export default function ClassSelector({ classes, selectedClassId, onSelect }: ClassSelectorProps) {
+export default function ClassSelector({
+  classes,
+  selectedClassId,
+  onSelect,
+  variant = "field",
+}: ClassSelectorProps) {
   const [open, setOpen] = useState(false);
   const label =
     selectedClassId === ALL_CLASSES_VALUE
-      ? "All classes"
+      ? "Select class"
       : (classes.find((c) => c.id === selectedClassId)?.name ?? "Select class");
 
   function pick(id: string) {
@@ -26,17 +32,32 @@ export default function ClassSelector({ classes, selectedClassId, onSelect }: Cl
     <>
       <TouchableOpacity
         onPress={() => setOpen(true)}
-        className="flex-row items-center gap-2 rounded-xl border border-line bg-cream px-3 py-2.5"
+        className={
+          variant === "header"
+            ? "flex-row items-center gap-1"
+            : "flex-row items-center gap-2 rounded-xl border border-line bg-cream px-3 py-2.5"
+        }
         accessibilityRole="button"
         accessibilityLabel={`Class: ${label}`}
       >
-        <View className="flex-1">
-          <Text className="text-[10px] font-semibold uppercase tracking-wide text-ink-faint">Class</Text>
-          <Text className="text-sm font-semibold text-ink" numberOfLines={1}>
-            {label}
-          </Text>
-        </View>
-        <ChevronDown size={18} color="#be3a2e" />
+        {variant === "header" ? (
+          <>
+            <Text className="text-xs font-bold text-ink-soft" numberOfLines={1}>
+              {label}
+            </Text>
+            {classes.length > 1 ? <ChevronDown size={14} color="#6f6151" /> : null}
+          </>
+        ) : (
+          <>
+            <View className="flex-1">
+              <Text className="text-[10px] font-semibold uppercase tracking-wide text-ink-faint">Class</Text>
+              <Text className="text-sm font-semibold text-ink" numberOfLines={1}>
+                {label}
+              </Text>
+            </View>
+            <ChevronDown size={18} color="#be3a2e" />
+          </>
+        )}
       </TouchableOpacity>
 
       <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>

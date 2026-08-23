@@ -34,9 +34,9 @@ export function resolveJobResumeTarget(job: GradeStackJob): JobResumeTarget {
   }
 
   if (job.phase === "preview") {
-    if (job.status === "needs_review" && job.preview) {
+    if (job.status === "needs_review") {
       const pageToStudentId = assignmentsToMap(
-        job.studentPageAssignments ?? job.preview.studentPageAssignments,
+        job.studentPageAssignments ?? job.preview?.studentPageAssignments,
       );
       return { kind: "review", previewJobId: job.id, pageToStudentId };
     }

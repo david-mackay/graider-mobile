@@ -12,6 +12,7 @@ import {
   registerForExpoPushToken,
   type PushNotificationData,
 } from "@/lib/push-notifications";
+import { setPendingGradeJobId } from "@/lib/pending-grade-job";
 
 function clearHandledNotificationResponse() {
   try {
@@ -25,15 +26,12 @@ function navigateFromPushData(
   router: ReturnType<typeof useRouter>,
   data: PushNotificationData,
 ) {
-  if (!isActionablePushData(data)) {
-    router.push("/(teacher)");
+  if (!isActionablePushData(data) || !data.jobId) {
+    router.replace("/(teacher)");
     return;
   }
-  if (data.jobId) {
-    router.push({ pathname: "/(teacher)/grade", params: { jobId: data.jobId } });
-    return;
-  }
-  router.push("/(teacher)/grade");
+  setPendingGradeJobId(data.jobId);
+  router.replace({ pathname: "/(teacher)/grade", params: { jobId: data.jobId } });
 }
 
 /**
@@ -50,6 +48,16 @@ export default function PushNotificationsProvider({ children }: { children: Reac
   const registeredTokenRef = useRef<string | null>(null);
   const pendingDataRef = useRef<PushNotificationData | null>(null);
   const handledResponseKeysRef = useRef<Set<string>>(new Set());
+  const bootstrappedLastResponseRef = useRef(false);
+
+  if (!bootstrappedLastResponseRef.current) {
+    bootstrappedLastResponseRef.current = true;
+    const last = Notifications.getLastNotificationResponse();
+    if (last) {
+      const data = parsePushNotificationData(last.notification.request.content.data);
+      if (data.jobId) setPendingGradeJobId(data.jobId);
+    }
+  }
 
   useEffect(() => {
     if (!isSignedIn || !user) return;

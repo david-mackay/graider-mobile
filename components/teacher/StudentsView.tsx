@@ -15,11 +15,15 @@ import IconButton from "@/components/shared/IconButton";
 import { IconUsers } from "@/components/shared/icons";
 import { GraiderApiError, handleJson } from "@/lib/dashboard-client";
 import { useGraiderFetch } from "@/lib/graider-fetch";
-import type { ClassMember, DashboardAttempt } from "@/lib/dashboard-types";
+import type { ClassMember, DashboardAttempt, DashboardClass } from "@/lib/dashboard-types";
+import ClassSelector from "@/components/teacher/ClassSelector";
 
 type StudentsViewProps = {
   classId: string | null;
   className: string | null;
+  classes: DashboardClass[];
+  selectedClassId: string;
+  onSelectClass: (classId: string) => void;
   members: ClassMember[];
   attemptsInScope: DashboardAttempt[];
   onChanged: () => void | Promise<void>;
@@ -32,6 +36,9 @@ type StudentsViewProps = {
 export default function StudentsView({
   classId,
   className,
+  classes,
+  selectedClassId,
+  onSelectClass,
   members,
   attemptsInScope,
   onChanged,
@@ -204,7 +211,7 @@ export default function StudentsView({
         subtitle={
           className
             ? `${className} · ${students.length} student${students.length !== 1 ? "s" : ""}`
-            : "Open a class to manage your roster."
+            : "Pick a class to manage its roster."
         }
         action={
           classId ? (
@@ -214,6 +221,10 @@ export default function StudentsView({
           ) : undefined
         }
       />
+
+      {classes.length > 0 ? (
+        <ClassSelector classes={classes} selectedClassId={selectedClassId} onSelect={onSelectClass} />
+      ) : null}
 
       {!classId ? (
         <Card className="items-center py-10">
@@ -327,11 +338,15 @@ export default function StudentsView({
       <FormSheet
         visible={addModalOpen}
         title="Add student"
-        subtitle="Name is required. Email helps match handwritten papers to the right student."
+        subtitle={
+          className
+            ? `Adds to ${className}. Name is required.`
+            : "Pick a class first, then add a student."
+        }
         onClose={() => setAddModalOpen(false)}
         primaryLabel="Save student"
         onPrimary={() => void addStudent()}
-        primaryDisabled={!newName.trim() || isBusy}
+        primaryDisabled={!newName.trim() || isBusy || !classId}
         primaryLoading={isBusy}
       >
         <View className="gap-4">

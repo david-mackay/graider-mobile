@@ -17,7 +17,7 @@ import {
   type GradingPhase,
   type StudentGradingProgress,
 } from "@/lib/grading-progress";
-import { resolveJobResumeTarget } from "@/lib/resume-grade-job";
+import { resolveJobResumeTarget, testSummaryFromJob } from "@/lib/resume-grade-job";
 import type {
   GradeStackJob,
   OcrAnswer,
@@ -534,7 +534,15 @@ export function useStudentGrade(): UseStudentGradeReturn {
           target = resolveJobResumeTarget(job);
         }
 
-        const test = await fetchTestSummary(graiderFetch, job.testId);
+        let test: TestSummary;
+        try {
+          test = await fetchTestSummary(graiderFetch, job.testId);
+        } catch {
+          test = testSummaryFromJob(
+            job,
+            job.preview?.discovery?.testTitle ?? "Test",
+          );
+        }
         setSelectedTest(test);
         setTestDiscovery(job.preview?.discovery ?? null);
 
@@ -543,7 +551,7 @@ export function useStudentGrade(): UseStudentGradeReturn {
           setGradingPhase(null);
           setActiveJob(null);
           setState("pickTest");
-          return;
+          throw new Error(target.message);
         }
 
         if (target.kind === "review") {
@@ -561,12 +569,16 @@ export function useStudentGrade(): UseStudentGradeReturn {
           setGradingPhase(null);
           setActiveJob(null);
           setState("results");
+          return;
         }
+
+        throw new Error("This grading job is not ready to open yet.");
       } catch (error) {
         setErrorMessage(error instanceof Error ? error.message : "Could not open grading job.");
         setGradingPhase(null);
         setActiveJob(null);
         setState("pickTest");
+        throw error;
       }
     },
     [graiderFetch],

@@ -70,16 +70,36 @@ export type PushNotificationData = {
   screen?: string;
 };
 
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value) return null;
+  if (typeof value === "string") {
+    try {
+      const parsed: unknown = JSON.parse(value);
+      return parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : null;
+    } catch {
+      return null;
+    }
+  }
+  if (typeof value === "object") return value as Record<string, unknown>;
+  return null;
+}
+
+function asJobId(value: unknown): string | undefined {
+  if (typeof value === "string" && value.trim() && value !== "undefined") return value.trim();
+  if (Array.isArray(value) && typeof value[0] === "string" && value[0].trim()) return value[0].trim();
+  return undefined;
+}
+
 export function parsePushNotificationData(data: unknown): PushNotificationData {
-  if (!data || typeof data !== "object") return {};
-  const record = data as Record<string, unknown>;
+  const record = asRecord(data);
+  if (!record) return {};
+  const nested = asRecord(record.data) ?? record;
+  const type = nested.type ?? record.type;
   return {
     type:
-      record.type === "grade_stack_preview" || record.type === "grade_stack_commit"
-        ? record.type
-        : undefined,
-    jobId: typeof record.jobId === "string" ? record.jobId : undefined,
-    screen: typeof record.screen === "string" ? record.screen : undefined,
+      type === "grade_stack_preview" || type === "grade_stack_commit" ? type : undefined,
+    jobId: asJobId(nested.jobId) ?? asJobId(record.jobId),
+    screen: typeof nested.screen === "string" ? nested.screen : typeof record.screen === "string" ? record.screen : undefined,
   };
 }
 

@@ -9,6 +9,7 @@ import {
   type AssignmentValue,
 } from "@/components/teacher/grade-wizard/use-stack-grade";
 import type { RosterEntry, StackPagePreview } from "@/lib/types";
+import { formatPrintedQuestionNumber } from "@/lib/question-index";
 
 type StepReviewMatchesProps = {
   pages: StackPagePreview[];
@@ -195,17 +196,14 @@ export default function StepReviewMatches({
                           </Text>
                         </TouchableOpacity>
                         {isAnswersOpen ? (
-                          <View className="mt-2 gap-1.5 rounded-lg border border-line bg-cream/40 p-3">
+                          <View className="mt-2 gap-3 rounded-lg border border-line bg-cream/40 p-3">
                             {page.ocrAnswers.map((answer, idx) => (
-                              <View key={idx} className="text-ink">
-                                <Text className="text-xs font-semibold text-pen-deep">
-                                  Q{answer.question_index != null ? answer.question_index + 1 : idx + 1}:
-                                  {" "}
-                                  <Text className="font-medium text-ink">
-                                  {answer.question}
-                                  </Text>
+                              <View key={idx} className="gap-1">
+                                <Text className="text-sm font-semibold leading-6 text-ink">
+                                  Q{formatPrintedQuestionNumber(answer.question_index) || idx + 1}
+                                  {answer.question ? ` · ${answer.question}` : ""}
                                 </Text>
-                                <Text className="mt-0.5 text-xs text-ink-soft">
+                                <Text className="text-base leading-6 text-ink">
                                   {answer.answer || "no answer"}
                                 </Text>
                               </View>

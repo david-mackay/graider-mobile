@@ -229,6 +229,9 @@ export default function TeacherDashboard() {
       <TeacherTopBar
         activeClassName={activeClassLabel(classes, selectedClassId)}
         profileName={profileName}
+        classes={classes}
+        selectedClassId={selectedClassId}
+        onSelectClass={(id) => void selectClass(id)}
         subscriptionLabel={
           subscription?.isPro
             ? "Pro"
@@ -304,6 +307,9 @@ export default function TeacherDashboard() {
               <StudentsView
                 classId={scopedClassId || null}
                 className={activeClass?.name ?? null}
+                classes={classes}
+                selectedClassId={selectedClassId}
+                onSelectClass={(id) => void selectClass(id)}
                 members={classMembers}
                 attemptsInScope={attemptsInScope}
                 onChanged={loadDashboard}

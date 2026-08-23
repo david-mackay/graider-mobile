@@ -52,6 +52,18 @@ describe("resume-grade-job", () => {
     expect(target.kind).toBe("results");
   });
 
+  it("resolves preview jobs to review even without a preview payload", () => {
+    const target = resolveJobResumeTarget({
+      ...baseJob,
+      preview: null,
+    });
+    expect(target.kind).toBe("review");
+    if (target.kind === "review") {
+      expect(target.previewJobId).toBe("job_1");
+      expect(target.pageToStudentId.get(0)).toBe("s1");
+    }
+  });
+
   it("waits on in-flight jobs", () => {
     const target = resolveJobResumeTarget({ ...baseJob, status: "processing" });
     expect(target.kind).toBe("wait");
