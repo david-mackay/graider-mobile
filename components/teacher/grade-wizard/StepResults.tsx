@@ -27,6 +27,7 @@ type OverrideTarget = {
   maxMarks: number;
   marksEarned: number;
   feedback: string;
+  correctAnswer: string;
 };
 
 function ratioColor(ratio: number): string {
@@ -92,8 +93,29 @@ export default function StepResults({
     });
   }
 
-  async function saveOverride(marksEarned: number, feedback: string) {
+  async function saveOverride(save: { marksEarned: number; feedback: string; correctAnswer: string }) {
     if (!overrideTarget) return;
+    const detail = attemptDetails.get(overrideTarget.attemptId);
+    const classId = detail?.test_class_id?.trim();
+    const studentAnswer =
+      detail?.questions.find((q) => q.question_id === overrideTarget.questionId)?.student_answer ?? "";
+    const keyChanged = save.correctAnswer !== overrideTarget.correctAnswer;
+
+    if (classId && save.correctAnswer && keyChanged) {
+      await handleJson(
+        await graiderFetch(`/api/questions/${overrideTarget.questionId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            class_id: classId,
+            classId,
+            correct_answer: save.correctAnswer,
+            correctAnswer: save.correctAnswer,
+          }),
+        }),
+      );
+    }
+
     const payload = await handleJson<{
       answer: { marks_earned: number; feedback: string; updated_at: string | null };
       attempt: { total_marks: number; max_marks: number };
@@ -103,7 +125,11 @@ export default function StepResults({
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ marksEarned, feedback }),
+          body: JSON.stringify(
+            keyChanged
+              ? { studentAnswer }
+              : { marksEarned: save.marksEarned, feedback: save.feedback },
+          ),
         },
       ),
     );
@@ -118,10 +144,11 @@ export default function StepResults({
         max_marks: payload.attempt.max_marks,
         questions: existing.questions.map((q) =>
           q.question_id === overrideTarget.questionId
-            ? {
+                            ? {
                 ...q,
                 marks_earned: payload.answer.marks_earned,
                 feedback: payload.answer.feedback,
+                correct_answer: save.correctAnswer,
                 graded_by: "teacher",
                 updated_at: payload.answer.updated_at,
               }
@@ -237,6 +264,7 @@ export default function StepResults({
                             maxMarks: question.marks,
                             marksEarned: question.marks_earned ?? 0,
                             feedback: question.feedback ?? "",
+                            correctAnswer: question.correct_answer ?? "",
                           })
                         }
                         className="rounded-lg border border-line bg-pen-wash/30 px-3 py-2"
@@ -259,6 +287,9 @@ export default function StepResults({
                         <Text className="mt-1 text-sm text-ink">{question.prompt}</Text>
                         <Text className="mt-1.5 text-sm text-ink-soft">
                           Answer: {question.student_answer || "—"}
+                        </Text>
+                        <Text className="mt-1 text-xs text-moss-deep">
+                          Key: {question.correct_answer?.trim() || "—"}
                         </Text>
                         {question.feedback ? (
                           <Text className="mt-1.5 text-xs text-moss-deep">{question.feedback}</Text>
@@ -297,6 +328,7 @@ export default function StepResults({
         maxMarks={overrideTarget?.maxMarks ?? 0}
         initialMarks={overrideTarget?.marksEarned ?? 0}
         initialFeedback={overrideTarget?.feedback ?? ""}
+        initialCorrectAnswer={overrideTarget?.correctAnswer ?? ""}
         onClose={() => setOverrideTarget(null)}
         onSave={saveOverride}
       />

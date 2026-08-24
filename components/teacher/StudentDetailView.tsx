@@ -219,6 +219,7 @@ export default function StudentDetailView({
             <AttemptBreakdownCard
               attempt={selectedAttemptDetail}
               studentName={displayName}
+              onAttemptChange={setSelectedAttemptDetail}
               onClose={() => setSelectedAttemptDetail(null)}
               prevLabel="Previous"
               nextLabel="Next"

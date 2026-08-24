@@ -8,8 +8,9 @@ type GradeOverrideSheetProps = {
   maxMarks: number;
   initialMarks: number;
   initialFeedback: string;
+  initialCorrectAnswer?: string;
   onClose: () => void;
-  onSave: (marksEarned: number, feedback: string) => Promise<void>;
+  onSave: (payload: { marksEarned: number; feedback: string; correctAnswer: string }) => Promise<void>;
 };
 
 export default function GradeOverrideSheet({
@@ -18,11 +19,13 @@ export default function GradeOverrideSheet({
   maxMarks,
   initialMarks,
   initialFeedback,
+  initialCorrectAnswer = "",
   onClose,
   onSave,
 }: GradeOverrideSheetProps) {
   const [marksText, setMarksText] = useState(String(initialMarks));
   const [feedback, setFeedback] = useState(initialFeedback);
+  const [correctAnswer, setCorrectAnswer] = useState(initialCorrectAnswer);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -30,9 +33,10 @@ export default function GradeOverrideSheet({
     if (visible) {
       setMarksText(String(initialMarks));
       setFeedback(initialFeedback);
+      setCorrectAnswer(initialCorrectAnswer);
       setError("");
     }
-  }, [visible, initialMarks, initialFeedback]);
+  }, [visible, initialMarks, initialFeedback, initialCorrectAnswer]);
 
   async function handleSave() {
     const marks = Number(marksText);
@@ -47,7 +51,11 @@ export default function GradeOverrideSheet({
     setSaving(true);
     setError("");
     try {
-      await onSave(Math.round(marks), feedback.trim());
+      await onSave({
+        marksEarned: Math.round(marks),
+        feedback: feedback.trim(),
+        correctAnswer: correctAnswer.trim(),
+      });
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save override.");
@@ -75,6 +83,18 @@ export default function GradeOverrideSheet({
             keyboardType="number-pad"
             className="rounded-xl border border-line bg-paper px-4 py-3 text-base text-ink"
           />
+
+          <Text className="mb-1 mt-3 text-xs font-semibold uppercase text-ink-faint">Answer key</Text>
+          <TextInput
+            value={correctAnswer}
+            onChangeText={setCorrectAnswer}
+            multiline
+            numberOfLines={3}
+            className="min-h-[72px] rounded-xl border border-moss/40 bg-moss-wash/40 px-4 py-3 text-sm text-ink"
+          />
+          <Text className="mt-1 text-[11px] text-ink-faint">
+            Shared across this test. Saving re-grades this student against the new key.
+          </Text>
 
           <Text className="mb-1 mt-3 text-xs font-semibold uppercase text-ink-faint">Feedback</Text>
           <TextInput

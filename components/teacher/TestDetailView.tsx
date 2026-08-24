@@ -285,6 +285,7 @@ export default function TestDetailView({
                   studentNameById.get(selectedAttemptDetail.student_id) ??
                   selectedAttemptDetail.student_name,
               })}
+              onAttemptChange={setSelectedAttemptDetail}
               onClose={() => setSelectedAttemptDetail(null)}
               prevLabel="Previous student"
               nextLabel="Next student"

@@ -1,14 +1,18 @@
 import { View, Text, Pressable, ScrollView } from "react-native";
+import { useState } from "react";
 import { Badge, Card, btnSecondary } from "@/components/shared/ui";
 import ExportGradePdfButton from "@/components/shared/ExportGradePdfButton";
-import GradedQuestionBreakdown from "@/components/shared/GradedQuestionBreakdown";
 import UploadAssetImage from "@/components/shared/UploadAssetImage";
-import type { GradedAttemptDetail } from "@/lib/dashboard-types";
+import GradeOverrideSheet from "@/components/teacher/grade-wizard/GradeOverrideSheet";
+import { handleJson } from "@/lib/dashboard-client";
+import { useGraiderFetch } from "@/lib/graider-fetch";
+import type { GradedAttemptDetail, GradedAttemptQuestion } from "@/lib/dashboard-types";
 
 type AttemptBreakdownCardProps = {
   attempt: GradedAttemptDetail;
   studentName?: string | null;
   onClose: () => void;
+  onAttemptChange?: (attempt: GradedAttemptDetail) => void;
   prevLabel?: string;
   nextLabel?: string;
   onPrevious?: () => void;
@@ -17,11 +21,16 @@ type AttemptBreakdownCardProps = {
   canGoNext?: boolean;
 };
 
-/** Graded submission detail: score, scans, per-question breakdown, PDF export. */
+type OverrideTarget = {
+  question: GradedAttemptQuestion;
+};
+
+/** Graded submission detail: score, scans, editable per-question marks and answer key. */
 export default function AttemptBreakdownCard({
   attempt,
   studentName,
   onClose,
+  onAttemptChange,
   prevLabel = "Previous",
   nextLabel = "Next",
   onPrevious,
@@ -29,8 +38,65 @@ export default function AttemptBreakdownCard({
   canGoPrevious = false,
   canGoNext = false,
 }: AttemptBreakdownCardProps) {
+  const graiderFetch = useGraiderFetch();
   const paperPhotos = attempt.ocr_uploads ?? [];
   const showNav = onPrevious && onNext;
+  const [target, setTarget] = useState<OverrideTarget | null>(null);
+
+  async function saveQuestion(save: { marksEarned: number; feedback: string; correctAnswer: string }) {
+    if (!target) return;
+    const question = target.question;
+    const classId = attempt.test_class_id?.trim();
+    const keyChanged = save.correctAnswer !== (question.correct_answer ?? "");
+
+    if (classId && save.correctAnswer && keyChanged) {
+      await handleJson(
+        await graiderFetch(`/api/questions/${question.question_id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            class_id: classId,
+            classId,
+            correct_answer: save.correctAnswer,
+            correctAnswer: save.correctAnswer,
+          }),
+        }),
+      );
+    }
+
+    const payload = await handleJson<{
+      answer: { marks_earned: number; feedback: string; updated_at: string | null };
+      attempt: { total_marks: number; max_marks: number };
+    }>(
+      await graiderFetch(`/api/submissions/${attempt.id}/answers/${question.question_id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          keyChanged
+            ? { studentAnswer: question.student_answer }
+            : { marksEarned: save.marksEarned, feedback: save.feedback },
+        ),
+      }),
+    );
+
+    onAttemptChange?.({
+      ...attempt,
+      total_marks: payload.attempt.total_marks,
+      max_marks: payload.attempt.max_marks,
+      questions: attempt.questions.map((item) =>
+        item.question_id === question.question_id
+          ? {
+              ...item,
+              marks_earned: payload.answer.marks_earned,
+              feedback: payload.answer.feedback,
+              correct_answer: save.correctAnswer,
+              graded_by: "teacher",
+              updated_at: payload.answer.updated_at,
+            }
+          : item,
+      ),
+    });
+  }
 
   return (
     <Card className="border-line">
@@ -47,9 +113,9 @@ export default function AttemptBreakdownCard({
             </Text>
           ) : (
             <View className="mt-2">
-            <Badge variant={attempt.status === "submitted" ? "blue" : "gray"}>
-              {attempt.status === "submitted" ? "pending" : attempt.status}
-            </Badge>
+              <Badge variant={attempt.status === "submitted" ? "blue" : "gray"}>
+                {attempt.status === "submitted" ? "pending" : attempt.status}
+              </Badge>
             </View>
           )}
         </View>
@@ -81,16 +147,36 @@ export default function AttemptBreakdownCard({
       ) : null}
 
       {attempt.questions.length > 0 ? (
-        <View className="mt-4">
-          <GradedQuestionBreakdown
-            questions={attempt.questions.map((question) => ({
-              prompt: question.prompt,
-              studentAnswer: question.student_answer,
-              feedback: question.feedback ?? undefined,
-              marksEarned: question.marks_earned ?? 0,
-              maxMarks: question.marks,
-            }))}
-          />
+        <View className="mt-4 gap-2">
+          <Text className="text-xs font-semibold uppercase tracking-wide text-ink-faint">
+            Tap a question to edit marks or the answer key
+          </Text>
+          {attempt.questions.map((question, index) => (
+            <Pressable
+              key={question.question_id}
+              onPress={() => setTarget({ question })}
+              className="rounded-lg border border-line bg-cream px-3 py-2"
+            >
+              <View className="flex-row items-start justify-between gap-3">
+                <Text className="text-xs font-semibold uppercase tracking-wide text-ink-faint">
+                  Question {index + 1}
+                </Text>
+                <Text className="text-sm font-bold text-pen">
+                  {question.marks_earned ?? 0}/{question.marks}
+                </Text>
+              </View>
+              <Text className="mt-1 text-sm text-ink">{question.prompt}</Text>
+              <Text className="mt-2 text-sm text-ink-soft">
+                Answer: {question.student_answer.trim() || "—"}
+              </Text>
+              <Text className="mt-1 text-xs text-moss-deep">
+                Key: {question.correct_answer?.trim() || "—"}
+              </Text>
+              {question.feedback?.trim() ? (
+                <Text className="mt-2 text-xs text-moss-deep">{question.feedback}</Text>
+              ) : null}
+            </Pressable>
+          ))}
         </View>
       ) : null}
 
@@ -112,6 +198,17 @@ export default function AttemptBreakdownCard({
           </Pressable>
         </View>
       ) : null}
+
+      <GradeOverrideSheet
+        visible={target !== null}
+        questionLabel={target?.question.prompt ?? ""}
+        maxMarks={target?.question.marks ?? 0}
+        initialMarks={target?.question.marks_earned ?? 0}
+        initialFeedback={target?.question.feedback ?? ""}
+        initialCorrectAnswer={target?.question.correct_answer ?? ""}
+        onClose={() => setTarget(null)}
+        onSave={saveQuestion}
+      />
     </Card>
   );
 }
