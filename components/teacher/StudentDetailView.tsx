@@ -78,7 +78,9 @@ export default function StudentDetailView({
 
   const selectedAttemptIndex = useMemo(() => {
     if (!selectedAttemptDetail) return -1;
-    return sortedAttempts.findIndex((attempt) => attempt.id === selectedAttemptDetail.id);
+    const byId = sortedAttempts.findIndex((attempt) => attempt.id === selectedAttemptDetail.id);
+    if (byId >= 0) return byId;
+    return sortedAttempts.findIndex((attempt) => attempt.test_id === selectedAttemptDetail.test_id);
   }, [selectedAttemptDetail, sortedAttempts]);
 
   const stats = useMemo(() => {
@@ -110,10 +112,8 @@ export default function StudentDetailView({
   }
 
   async function openRelativeAttempt(offset: -1 | 1) {
-    if (sortedAttempts.length === 0) return;
-    const fallbackIndex = offset > 0 ? 0 : sortedAttempts.length - 1;
-    const currentIndex = selectedAttemptIndex >= 0 ? selectedAttemptIndex : fallbackIndex;
-    const nextIndex = currentIndex + offset;
+    if (sortedAttempts.length === 0 || selectedAttemptIndex < 0) return;
+    const nextIndex = selectedAttemptIndex + offset;
     if (nextIndex < 0 || nextIndex >= sortedAttempts.length) return;
     await openAttemptDetail(sortedAttempts[nextIndex].id);
   }
@@ -121,6 +121,7 @@ export default function StudentDetailView({
   const displayName = studentName ?? "Student";
 
   return (
+    <View className="flex-1 bg-cream">
     <ScrollView className="flex-1 bg-cream px-4 py-4">
       <SectionHeader
         title={displayName}
@@ -214,23 +215,23 @@ export default function StudentDetailView({
               )}
             </View>
           </Card>
-
-          {selectedAttemptDetail ? (
-            <AttemptBreakdownCard
-              attempt={selectedAttemptDetail}
-              studentName={displayName}
-              onAttemptChange={setSelectedAttemptDetail}
-              onClose={() => setSelectedAttemptDetail(null)}
-              prevLabel="Previous"
-              nextLabel="Next"
-              onPrevious={() => void openRelativeAttempt(-1)}
-              onNext={() => void openRelativeAttempt(1)}
-              canGoPrevious={selectedAttemptIndex > 0}
-              canGoNext={selectedAttemptIndex >= 0 && selectedAttemptIndex < sortedAttempts.length - 1}
-            />
-          ) : null}
         </View>
       )}
     </ScrollView>
+    {selectedAttemptDetail ? (
+      <AttemptBreakdownCard
+        attempt={selectedAttemptDetail}
+        studentName={displayName}
+        onAttemptChange={setSelectedAttemptDetail}
+        onClose={() => setSelectedAttemptDetail(null)}
+        prevLabel="Previous test"
+        nextLabel="Next test"
+        onPrevious={() => openRelativeAttempt(-1)}
+        onNext={() => openRelativeAttempt(1)}
+        canGoPrevious={selectedAttemptIndex > 0}
+        canGoNext={selectedAttemptIndex >= 0 && selectedAttemptIndex < sortedAttempts.length - 1}
+      />
+    ) : null}
+    </View>
   );
 }
