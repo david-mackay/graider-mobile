@@ -46,9 +46,12 @@ export default function AttemptBreakdownCard({
   const showNav = Boolean(onPrevious && onNext);
   const [target, setTarget] = useState<OverrideTarget | null>(null);
   const [navBusy, setNavBusy] = useState(false);
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
+  const previewPath = previewIndex !== null ? paperPhotos[previewIndex] : undefined;
 
   useEffect(() => {
     setTarget(null);
+    setPreviewIndex(null);
     scrollRef.current?.scrollTo({ y: 0, animated: false });
   }, [attempt.id]);
 
@@ -209,15 +212,16 @@ export default function AttemptBreakdownCard({
             {paperPhotos.length > 0 ? (
               <View>
                 <Text className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-faint">
-                  Scanned paper ({paperPhotos.length})
+                  Scanned paper ({paperPhotos.length}) · tap to enlarge
                 </Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row gap-2">
-                  {paperPhotos.map((path) => (
-                    <UploadAssetImage
-                      key={path}
-                      storagePath={path}
-                      className="h-36 w-28 rounded-lg border border-line bg-cream"
-                    />
+                  {paperPhotos.map((path, index) => (
+                    <Pressable key={path} onPress={() => setPreviewIndex(index)}>
+                      <UploadAssetImage
+                        storagePath={path}
+                        className="h-36 w-28 rounded-lg border border-line bg-cream"
+                      />
+                    </Pressable>
                   ))}
                 </ScrollView>
               </View>
@@ -291,6 +295,53 @@ export default function AttemptBreakdownCard({
           <View style={{ height: insets.bottom }} />
         )}
       </View>
+
+      <Modal
+        visible={previewPath != null}
+        animationType="fade"
+        presentationStyle="fullScreen"
+        onRequestClose={() => setPreviewIndex(null)}
+      >
+        <View className="flex-1 bg-ink" style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}>
+          <View className="flex-row items-center justify-between px-4 py-3">
+            <Text className="text-sm font-semibold text-white">
+              {previewIndex !== null ? `${previewIndex + 1} / ${paperPhotos.length}` : ""}
+            </Text>
+            <Pressable className={btnSecondary} onPress={() => setPreviewIndex(null)}>
+              <Text className="text-sm font-medium text-pen-deep">Close</Text>
+            </Pressable>
+          </View>
+          {previewPath ? (
+            <UploadAssetImage
+              storagePath={previewPath}
+              resizeMode="contain"
+              style={{ flex: 1, width: "100%" }}
+            />
+          ) : null}
+          {paperPhotos.length > 1 ? (
+            <View className="flex-row gap-2 px-4 py-3">
+              <Pressable
+                className={`flex-1 ${btnSecondary} items-center ${previewIndex === 0 ? "opacity-50" : ""}`}
+                onPress={() => setPreviewIndex((index) => (index !== null && index > 0 ? index - 1 : index))}
+                disabled={previewIndex === 0}
+              >
+                <Text className="text-sm font-medium text-pen-deep">Previous page</Text>
+              </Pressable>
+              <Pressable
+                className={`flex-1 ${btnSecondary} items-center ${previewIndex === paperPhotos.length - 1 ? "opacity-50" : ""}`}
+                onPress={() =>
+                  setPreviewIndex((index) =>
+                    index !== null && index < paperPhotos.length - 1 ? index + 1 : index,
+                  )
+                }
+                disabled={previewIndex === paperPhotos.length - 1}
+              >
+                <Text className="text-sm font-medium text-pen-deep">Next page</Text>
+              </Pressable>
+            </View>
+          ) : null}
+        </View>
+      </Modal>
 
       <GradeOverrideSheet
         visible={target !== null}

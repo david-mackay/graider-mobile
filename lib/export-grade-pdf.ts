@@ -167,6 +167,11 @@ export function sharePdfFile(uri: string, filename: string): void {
   });
 }
 
+/** Native print/preview UI — the full-screen PDF viewer on iOS. */
+export async function openPdfPreview(uri: string): Promise<void> {
+  await Print.printAsync({ uri });
+}
+
 export async function fetchAndExportAttemptPdf(
   fetchAttempt: (attemptId: string) => Promise<GradedAttemptDetail>,
   attemptId: string,

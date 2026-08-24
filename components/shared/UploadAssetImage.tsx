@@ -7,10 +7,16 @@ type UploadAssetImageProps = {
   storagePath: string;
   className?: string;
   style?: StyleProp<ImageStyle>;
+  resizeMode?: ImageStyle extends never ? never : "cover" | "contain" | "stretch" | "center";
 };
 
 /** Renders a stored upload (stack photo) with Clerk auth headers. */
-export default function UploadAssetImage({ storagePath, className, style }: UploadAssetImageProps) {
+export default function UploadAssetImage({
+  storagePath,
+  className,
+  style,
+  resizeMode = "cover",
+}: UploadAssetImageProps) {
   const { getToken } = useAuth();
   const [authHeaders, setAuthHeaders] = useState<Record<string, string> | null>(null);
 
@@ -35,7 +41,7 @@ export default function UploadAssetImage({ storagePath, className, style }: Uplo
       source={{ uri: uploadAssetUrl(storagePath), headers: authHeaders }}
       className={className}
       style={style}
-      resizeMode="cover"
+      resizeMode={resizeMode}
     />
   );
 }

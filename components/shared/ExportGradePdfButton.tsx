@@ -10,9 +10,8 @@ import {
 } from "react-native";
 import { btnPrimary, btnSecondary, Card, SettingSwitchRow } from "@/components/shared/ui";
 import type { GradedAttemptDetail } from "@/lib/dashboard-types";
-import { generateAttemptPdf, sharePdfFile } from "@/lib/export-grade-pdf";
+import { generateAttemptPdf, openPdfPreview, sharePdfFile } from "@/lib/export-grade-pdf";
 import * as Sharing from "expo-sharing";
-import * as Linking from "expo-linking";
 
 type ExportGradePdfButtonProps = {
   attempt?: GradedAttemptDetail | null;
@@ -104,14 +103,9 @@ export default function ExportGradePdfButton({
   async function handleOpenPreview() {
     if (!pdfUri) return;
     try {
-      const canOpen = await Linking.canOpenURL(pdfUri);
-      if (!canOpen) {
-        setError("Could not open PDF preview on this device.");
-        return;
-      }
-      await Linking.openURL(pdfUri);
+      await openPdfPreview(pdfUri);
     } catch {
-      setError("Could not open PDF preview on this device.");
+      setError("Could not open the PDF. Use Share PDF, then Print for a full-screen view.");
     }
   }
 
@@ -187,7 +181,7 @@ export default function ExportGradePdfButton({
               <>
                 <Text className="font-display text-xl font-semibold text-ink">Preview PDF</Text>
                 <Text className="mt-1 text-sm text-ink-soft">
-                  Review the graded paper, then share with the system share sheet.
+                  Share the file, or open the full-screen print preview to pinch-zoom and read it.
                 </Text>
 
                 <ScrollView className="mt-4 max-h-96" contentContainerStyle={{ paddingBottom: 8 }}>
@@ -254,7 +248,7 @@ export default function ExportGradePdfButton({
                     onPress={() => void handleOpenPreview()}
                     className={`${btnSecondary} items-center py-3`}
                   >
-                    <Text className="text-sm font-medium text-pen-deep">Open full PDF</Text>
+                    <Text className="text-sm font-medium text-pen-deep">View full screen</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     onPress={() => {
