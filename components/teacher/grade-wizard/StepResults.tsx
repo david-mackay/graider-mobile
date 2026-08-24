@@ -28,6 +28,7 @@ type OverrideTarget = {
   marksEarned: number;
   feedback: string;
   correctAnswer: string;
+  studentAnswer: string;
 };
 
 function ratioColor(ratio: number): string {
@@ -93,13 +94,17 @@ export default function StepResults({
     });
   }
 
-  async function saveOverride(save: { marksEarned: number; feedback: string; correctAnswer: string }) {
+  async function saveOverride(save: {
+    marksEarned: number;
+    feedback: string;
+    correctAnswer: string;
+    studentAnswer: string;
+  }) {
     if (!overrideTarget) return;
     const detail = attemptDetails.get(overrideTarget.attemptId);
     const classId = detail?.test_class_id?.trim();
-    const studentAnswer =
-      detail?.questions.find((q) => q.question_id === overrideTarget.questionId)?.student_answer ?? "";
     const keyChanged = save.correctAnswer !== overrideTarget.correctAnswer;
+    const answerChanged = save.studentAnswer !== overrideTarget.studentAnswer;
 
     if (classId && save.correctAnswer && keyChanged) {
       await handleJson(
@@ -117,7 +122,7 @@ export default function StepResults({
     }
 
     const payload = await handleJson<{
-      answer: { marks_earned: number; feedback: string; updated_at: string | null };
+      answer: { student_answer?: string; marks_earned: number; feedback: string; updated_at: string | null };
       attempt: { total_marks: number; max_marks: number };
     }>(
       await graiderFetch(
@@ -126,13 +131,43 @@ export default function StepResults({
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(
-            keyChanged
-              ? { studentAnswer }
+            answerChanged || keyChanged
+              ? { studentAnswer: save.studentAnswer, student_answer: save.studentAnswer }
               : { marksEarned: save.marksEarned, feedback: save.feedback },
           ),
         },
       ),
     );
+
+    let nextMarks = payload.answer.marks_earned;
+    let nextFeedback = payload.answer.feedback;
+    let nextAnswer = payload.answer.student_answer ?? save.studentAnswer;
+    let nextAttempt = payload.attempt;
+    let nextUpdatedAt = payload.answer.updated_at;
+
+    if (
+      (answerChanged || keyChanged) &&
+      (save.marksEarned !== nextMarks || save.feedback !== (nextFeedback ?? ""))
+    ) {
+      const marksPayload = await handleJson<{
+        answer: { student_answer?: string; marks_earned: number; feedback: string; updated_at: string | null };
+        attempt: { total_marks: number; max_marks: number };
+      }>(
+        await graiderFetch(
+          `/api/submissions/${overrideTarget.attemptId}/answers/${overrideTarget.questionId}`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ marksEarned: save.marksEarned, feedback: save.feedback }),
+          },
+        ),
+      );
+      nextMarks = marksPayload.answer.marks_earned;
+      nextFeedback = marksPayload.answer.feedback;
+      nextAnswer = marksPayload.answer.student_answer ?? nextAnswer;
+      nextAttempt = marksPayload.attempt;
+      nextUpdatedAt = marksPayload.answer.updated_at;
+    }
 
     setAttemptDetails((prev) => {
       const existing = prev.get(overrideTarget.attemptId);
@@ -140,17 +175,18 @@ export default function StepResults({
       const next = new Map(prev);
       next.set(overrideTarget.attemptId, {
         ...existing,
-        total_marks: payload.attempt.total_marks,
-        max_marks: payload.attempt.max_marks,
+        total_marks: nextAttempt.total_marks,
+        max_marks: nextAttempt.max_marks,
         questions: existing.questions.map((q) =>
           q.question_id === overrideTarget.questionId
                             ? {
                 ...q,
-                marks_earned: payload.answer.marks_earned,
-                feedback: payload.answer.feedback,
+                student_answer: nextAnswer,
+                marks_earned: nextMarks,
+                feedback: nextFeedback,
                 correct_answer: save.correctAnswer,
                 graded_by: "teacher",
-                updated_at: payload.answer.updated_at,
+                updated_at: nextUpdatedAt,
               }
             : q,
         ),
@@ -163,11 +199,11 @@ export default function StepResults({
         row.attemptId === overrideTarget.attemptId
           ? {
               ...row,
-              totalMarks: payload.attempt.total_marks,
-              maxMarks: payload.attempt.max_marks,
+              totalMarks: nextAttempt.total_marks,
+              maxMarks: nextAttempt.max_marks,
               grades: row.grades.map((g) =>
                 g.questionId === overrideTarget.questionId
-                  ? { ...g, marksEarned: payload.answer.marks_earned, feedback: payload.answer.feedback }
+                  ? { ...g, marksEarned: nextMarks, feedback: nextFeedback }
                   : g,
               ),
             }
@@ -265,6 +301,7 @@ export default function StepResults({
                             marksEarned: question.marks_earned ?? 0,
                             feedback: question.feedback ?? "",
                             correctAnswer: question.correct_answer ?? "",
+                            studentAnswer: question.student_answer ?? "",
                           })
                         }
                         className="rounded-lg border border-line bg-pen-wash/30 px-3 py-2"
@@ -329,6 +366,7 @@ export default function StepResults({
         initialMarks={overrideTarget?.marksEarned ?? 0}
         initialFeedback={overrideTarget?.feedback ?? ""}
         initialCorrectAnswer={overrideTarget?.correctAnswer ?? ""}
+        initialStudentAnswer={overrideTarget?.studentAnswer ?? ""}
         onClose={() => setOverrideTarget(null)}
         onSave={saveOverride}
       />

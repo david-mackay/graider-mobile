@@ -26,7 +26,7 @@ type OverrideTarget = {
   question: GradedAttemptQuestion;
 };
 
-/** Full-screen editor for a graded paper: scans, marks, and answer key. */
+/** Full-screen editor for a graded paper: scans, student answers, marks, and answer key. */
 export default function AttemptBreakdownCard({
   attempt,
   studentName,
@@ -65,11 +65,19 @@ export default function AttemptBreakdownCard({
     }
   }
 
-  async function saveQuestion(save: { marksEarned: number; feedback: string; correctAnswer: string }) {
+  async function saveQuestion(save: {
+    marksEarned: number;
+    feedback: string;
+    correctAnswer: string;
+    studentAnswer: string;
+  }) {
     if (!target) return;
     const question = target.question;
     const classId = attempt.test_class_id?.trim();
-    const keyChanged = save.correctAnswer !== (question.correct_answer ?? "");
+    const currentAnswer = question.student_answer ?? "";
+    const currentKey = question.correct_answer ?? "";
+    const keyChanged = save.correctAnswer !== currentKey;
+    const answerChanged = save.studentAnswer !== currentAnswer;
 
     if (classId && save.correctAnswer && keyChanged) {
       await handleJson(
@@ -87,19 +95,54 @@ export default function AttemptBreakdownCard({
     }
 
     const payload = await handleJson<{
-      answer: { marks_earned: number; feedback: string; updated_at: string | null };
+      answer: {
+        student_answer: string;
+        marks_earned: number;
+        feedback: string;
+        updated_at: string | null;
+      };
       attempt: { total_marks: number; max_marks: number };
     }>(
       await graiderFetch(`/api/submissions/${attempt.id}/answers/${question.question_id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(
-          keyChanged
-            ? { studentAnswer: question.student_answer }
+          answerChanged || keyChanged
+            ? { studentAnswer: save.studentAnswer, student_answer: save.studentAnswer }
             : { marksEarned: save.marksEarned, feedback: save.feedback },
         ),
       }),
     );
+
+    let nextMarks = payload.answer.marks_earned;
+    let nextFeedback = payload.answer.feedback;
+    let nextAnswer = payload.answer.student_answer ?? save.studentAnswer;
+
+    if (
+      (answerChanged || keyChanged) &&
+      (save.marksEarned !== nextMarks || save.feedback !== (nextFeedback ?? ""))
+    ) {
+      const marksPayload = await handleJson<{
+        answer: {
+          student_answer: string;
+          marks_earned: number;
+          feedback: string;
+          updated_at: string | null;
+        };
+        attempt: { total_marks: number; max_marks: number };
+      }>(
+        await graiderFetch(`/api/submissions/${attempt.id}/answers/${question.question_id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ marksEarned: save.marksEarned, feedback: save.feedback }),
+        }),
+      );
+      nextMarks = marksPayload.answer.marks_earned;
+      nextFeedback = marksPayload.answer.feedback;
+      nextAnswer = marksPayload.answer.student_answer ?? nextAnswer;
+      payload.attempt = marksPayload.attempt;
+      payload.answer.updated_at = marksPayload.answer.updated_at;
+    }
 
     onAttemptChange?.({
       ...attempt,
@@ -109,8 +152,9 @@ export default function AttemptBreakdownCard({
         item.question_id === question.question_id
           ? {
               ...item,
-              marks_earned: payload.answer.marks_earned,
-              feedback: payload.answer.feedback,
+              student_answer: nextAnswer,
+              marks_earned: nextMarks,
+              feedback: nextFeedback,
               correct_answer: save.correctAnswer,
               graded_by: "teacher",
               updated_at: payload.answer.updated_at,
@@ -180,9 +224,9 @@ export default function AttemptBreakdownCard({
             ) : null}
 
             {attempt.questions.length > 0 ? (
-              <View className="mt-4 gap-2">
+              <View className={paperPhotos.length > 0 ? "mt-4 gap-2" : "gap-2"}>
                 <Text className="text-xs font-semibold uppercase tracking-wide text-ink-faint">
-                  Tap a question to edit marks or the answer key
+                  Tap a question to edit the student answer, marks, or answer key
                 </Text>
                 {attempt.questions.map((question, index) => (
                   <Pressable
@@ -200,10 +244,10 @@ export default function AttemptBreakdownCard({
                     </View>
                     <Text className="mt-1 text-sm text-ink">{question.prompt}</Text>
                     <Text className="mt-2 text-sm text-ink-soft">
-                      Answer: {question.student_answer.trim() || "—"}
+                      Answer: {(question.student_answer ?? "").trim() || "—"}
                     </Text>
                     <Text className="mt-1 text-xs text-moss-deep">
-                      Key: {question.correct_answer?.trim() || "—"}
+                      Key: {(question.correct_answer ?? "").trim() || "—"}
                     </Text>
                     {question.feedback?.trim() ? (
                       <Text className="mt-2 text-xs text-moss-deep">{question.feedback}</Text>
@@ -212,7 +256,7 @@ export default function AttemptBreakdownCard({
                 ))}
               </View>
             ) : (
-              <Text className="text-sm text-ink-soft">No questions on this paper yet.</Text>
+              <Text className="mt-4 text-sm text-ink-soft">No questions on this paper yet.</Text>
             )}
           </ScrollView>
 
@@ -255,6 +299,7 @@ export default function AttemptBreakdownCard({
         initialMarks={target?.question.marks_earned ?? 0}
         initialFeedback={target?.question.feedback ?? ""}
         initialCorrectAnswer={target?.question.correct_answer ?? ""}
+        initialStudentAnswer={target?.question.student_answer ?? ""}
         onClose={() => setTarget(null)}
         onSave={saveQuestion}
       />
