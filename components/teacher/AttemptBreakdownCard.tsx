@@ -216,7 +216,7 @@ export default function AttemptBreakdownCard({
                 </Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row gap-2">
                   {paperPhotos.map((path, index) => (
-                    <Pressable key={path} onPress={() => setPreviewIndex(index)}>
+                    <Pressable key={`${index}:${path}`} onPress={() => setPreviewIndex(index)}>
                       <UploadAssetImage
                         storagePath={path}
                         className="h-36 w-28 rounded-lg border border-line bg-cream"
@@ -313,6 +313,7 @@ export default function AttemptBreakdownCard({
           </View>
           {previewPath ? (
             <UploadAssetImage
+              key={`${previewIndex}:${previewPath}`}
               storagePath={previewPath}
               resizeMode="contain"
               style={{ flex: 1, width: "100%" }}

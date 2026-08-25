@@ -1,13 +1,13 @@
 import { useAuth } from "@clerk/clerk-expo";
 import { useEffect, useState } from "react";
-import { Image, View, type ImageStyle, type StyleProp } from "react-native";
+import { Image, View, type ImageResizeMode, type ImageStyle, type StyleProp } from "react-native";
 import { uploadAssetUrl } from "@/lib/upload-asset-url";
 
 type UploadAssetImageProps = {
   storagePath: string;
   className?: string;
   style?: StyleProp<ImageStyle>;
-  resizeMode?: ImageStyle extends never ? never : "cover" | "contain" | "stretch" | "center";
+  resizeMode?: ImageResizeMode;
 };
 
 /** Renders a stored upload (stack photo) with Clerk auth headers. */
@@ -36,9 +36,12 @@ export default function UploadAssetImage({
     return <View className={`bg-cream-deep ${className ?? ""}`} style={style} />;
   }
 
+  const uri = uploadAssetUrl(storagePath);
+
   return (
     <Image
-      source={{ uri: uploadAssetUrl(storagePath), headers: authHeaders }}
+      key={uri}
+      source={{ uri, headers: authHeaders, cache: "reload" }}
       className={className}
       style={style}
       resizeMode={resizeMode}
