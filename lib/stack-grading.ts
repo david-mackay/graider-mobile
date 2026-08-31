@@ -378,52 +378,22 @@ export async function commitStack(params: {
   for (const page of pages) {
     const { studentId, ocrAnswers } = page;
 
-    // Idempotent attempt creation: same pattern as teacher-attempt.
-    const [existing] = await db
-      .select({
-        id: testAttempts.id,
-        source: testAttempts.source,
-        submittedAt: testAttempts.submittedAt,
+    const [inserted] = await db
+      .insert(testAttempts)
+      .values({
+        testId,
+        studentId,
+        source: "teacher_ocr",
+        status: "submitted",
+        submittedAt: new Date(),
       })
-      .from(testAttempts)
-      .where(
-        and(eq(testAttempts.testId, testId), eq(testAttempts.studentId, studentId)),
-      )
-      .limit(1);
+      .returning({ id: testAttempts.id });
 
-    let attemptId: string;
-    let created: boolean;
-
-    if (existing) {
-      if (existing.source === "student") {
-        if (!existing.submittedAt) {
-          throw new Error(
-            "This student still has an in-progress digital attempt. Wait for them to submit, or clear that attempt before grading their paper.",
-          );
-        }
-        throw new Error(
-          "This student already submitted digitally. Stack OCR cannot overwrite a digital submission.",
-        );
-      }
-      attemptId = existing.id;
-      created = false;
-    } else {
-      const [inserted] = await db
-        .insert(testAttempts)
-        .values({
-          testId,
-          studentId,
-          status: "submitted",
-          submittedAt: new Date(),
-        })
-        .returning({ id: testAttempts.id });
-
-      if (!inserted) {
-        throw new Error("Failed to create attempt for student.");
-      }
-      attemptId = inserted.id;
-      created = true;
+    if (!inserted) {
+      throw new Error("Failed to create attempt for student.");
     }
+    const attemptId = inserted.id;
+    const created = true;
 
     // Match OCR answers to test_questions and upsert.
     const matchRows: { questionId: string; studentAnswer: string }[] = [];

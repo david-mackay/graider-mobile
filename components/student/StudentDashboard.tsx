@@ -27,6 +27,7 @@ import StatusBanner from "@/components/shared/StatusBanner";
 import ProfileSetup from "@/components/onboarding/ProfileSetup";
 import StudentClassesView from "@/components/student/ClassesView";
 import TestList from "@/components/student/TestList";
+import { pickStudentFacingAttempt } from "@/lib/pick-student-facing-attempt";
 import TestTakingForm from "@/components/student/TestTakingForm";
 import AttemptDetailCard from "@/components/student/AttemptDetailCard";
 
@@ -181,7 +182,7 @@ export default function StudentDashboard() {
     () =>
       testsInScope.map((test) => ({
         test,
-        attempt: attemptsInScope.find((a) => a.test_id === test.id) ?? null,
+        attempt: pickStudentFacingAttempt(attemptsInScope, test.id),
       })),
     [testsInScope, attemptsInScope],
   );

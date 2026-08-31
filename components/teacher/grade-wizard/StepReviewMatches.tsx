@@ -120,7 +120,7 @@ export default function StepReviewMatches({
           </View>
         </View>
         <Text className="mt-3 text-xs text-ink-faint">
-          Re-grading existing attempts will overwrite previous answers.
+          Re-grading saves a new attempt. Earlier grades stay in the student's history.
         </Text>
       </Card>
 

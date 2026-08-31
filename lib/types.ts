@@ -100,6 +100,7 @@ export type TestAttempt = {
   id: string;
   test_id: string;
   student_id: string;
+  source?: "student" | "teacher_ocr";
   status: "submitted" | "graded" | "draft" | "grading";
   release_status?: "ready" | "grading" | "released" | null;
   total_marks: number | null;

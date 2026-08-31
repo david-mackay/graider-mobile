@@ -196,9 +196,10 @@ export default function StudentDetailView({
                           {attempt.test_title}
                         </Text>
                         <Text className="mt-0.5 text-[11px] text-ink-soft">
+                          {attempt.source === "teacher_ocr" ? "Paper scan" : "Digital"}
                           {attempt.status === "graded"
-                            ? `Score ${attempt.total_marks ?? 0}/${attempt.max_marks ?? 0}`
-                            : "Not graded yet"}
+                            ? ` · Score ${attempt.total_marks ?? 0}/${attempt.max_marks ?? 0}`
+                            : " · Not graded yet"}
                           {dateLabel ? ` · ${dateLabel}` : ""}
                         </Text>
                       </View>
