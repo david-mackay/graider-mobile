@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { View, Text, Pressable, ScrollView } from "react-native";
+import { KeyboardAvoidingView, Platform, View, Text, Pressable, ScrollView } from "react-native";
 import { useRouter } from "expo-router";
 import { Badge, Card, SectionHeader, btnPrimary, btnSecondary } from "@/components/shared/ui";
 import AttemptBreakdownCard from "@/components/teacher/AttemptBreakdownCard";
+import TestStructureEditor from "@/components/teacher/TestStructureEditor";
 import { handleJson } from "@/lib/dashboard-client";
 import { useGraiderFetch } from "@/lib/graider-fetch";
 import type { ClassMember, DashboardAttempt, GradedAttemptDetail } from "@/lib/dashboard-types";
@@ -50,6 +51,7 @@ export default function TestDetailView({
   const [selectedAttemptDetail, setSelectedAttemptDetail] = useState<GradedAttemptDetail | null>(null);
 
   const [isAdminBusy, setIsAdminBusy] = useState(false);
+  const [structureDragging, setStructureDragging] = useState(false);
 
   const hasContext = Boolean(testId);
 
@@ -72,9 +74,9 @@ export default function TestDetailView({
     }
   }
 
-  async function loadData() {
+  async function loadData(opts?: { silent?: boolean }) {
     if (!testId) return;
-    setIsLoading(true);
+    if (!opts?.silent) setIsLoading(true);
     setError("");
     try {
       const [testRes, attemptsRes, rosterRes] = await Promise.all([
@@ -153,7 +155,15 @@ export default function TestDetailView({
 
   return (
     <View className="flex-1 bg-cream">
-    <ScrollView className="flex-1 bg-cream px-4 py-4">
+    <KeyboardAvoidingView
+      className="flex-1"
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+    >
+    <ScrollView
+      className="flex-1 bg-cream px-4 py-4"
+      keyboardShouldPersistTaps="handled"
+      scrollEnabled={!structureDragging}
+    >
       <SectionHeader
         title={test?.title ?? "Test details"}
         subtitle={className ?? "Class results for this test"}
@@ -230,19 +240,13 @@ export default function TestDetailView({
           ) : null}
 
           {test ? (
-            <Card className="border-line">
-              <Text className="text-xs font-semibold uppercase tracking-wide text-ink-faint">Test structure</Text>
-              <View className="mt-2 gap-2">
-                {test.questions.map((q, i) => (
-                  <View key={q.question_id} className="rounded-lg border border-line bg-pen-wash/30 p-3">
-                    <Text className="text-xs font-semibold text-ink-faint">
-                      Q{i + 1} · {q.marks} mark{q.marks !== 1 ? "s" : ""}
-                    </Text>
-                    <Text className="mt-0.5 text-sm text-ink">{q.prompt}</Text>
-                  </View>
-                ))}
-              </View>
-            </Card>
+            <TestStructureEditor
+              test={test}
+              graiderFetch={graiderFetch}
+              onChanged={() => loadData({ silent: true })}
+              onError={setError}
+              onDraggingChange={setStructureDragging}
+            />
           ) : null}
 
           <Card className="border-line">
@@ -281,6 +285,7 @@ export default function TestDetailView({
         </View>
       )}
     </ScrollView>
+    </KeyboardAvoidingView>
     {selectedAttemptDetail ? (
       <AttemptBreakdownCard
         attempt={selectedAttemptDetail}
