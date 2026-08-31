@@ -5,7 +5,6 @@ import { router } from "expo-router";
 import * as FileSystem from "expo-file-system/legacy";
 import OnboardingShell from "@/components/marketing/OnboardingShell";
 import StepCapturePages from "@/components/teacher/grade-wizard/StepCapturePages";
-import { X } from "lucide-react-native";
 import { getVault, setVault } from "@/lib/onboarding/vault";
 import { ONBOARDING_EVENTS, fireEvent } from "@/lib/onboarding/funnel-events";
 import {
@@ -18,10 +17,16 @@ import {
   type OnboardingSampleGrade,
   type OnboardingStudentSubmission,
 } from "@/lib/onboarding/types";
-import { appendImageToFormData, type PickedImage } from "@/lib/picked-image";
-import ParsePresetPicker from "@/components/shared/ParsePresetPicker";
+import { appendImageToFormData, isPdfPage, type PickedImage } from "@/lib/picked-image";
+import { X } from "lucide-react-native";
+import DeterminateProgressBar from "@/components/shared/DeterminateProgressBar";
+import {
+  postFormDataWithProgress,
+  resultFromProgressHttp,
+} from "@/lib/upload-progress";
 import {
   defaultPresetForSurface,
+  coerceParsePreset,
   type DocumentParsePreset,
 } from "@/lib/parse-presets";
 
@@ -36,12 +41,26 @@ function papersToPickedImages(papers: OnboardingPaper[]): PickedImage[] {
     }));
 }
 
+function fileExtension(page: PickedImage): string {
+  if (isPdfPage(page)) return "pdf";
+  const match = page.name.match(/\.([a-z0-9]+)$/i);
+  return match?.[1]?.toLowerCase() ?? "jpg";
+}
+
+function isGraded(student: OnboardingStudentSubmission): boolean {
+  return (
+    !!student.grade &&
+    Number.isInteger(student.grade.marksEarned) &&
+    Number.isInteger(student.grade.maxMarks)
+  );
+}
+
 export default function OnboardingUploadPage() {
   const [keys, setKeys] = useState<OnboardingAnswerKey[]>([]);
   const [students, setStudents] = useState<OnboardingStudentSubmission[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  const [phase, setPhase] = useState<"form" | "capture">("form");
+  const [phase, setPhase] = useState<"summary" | "capture">("summary");
   const [mode, setMode] = useState<"photo" | "typed">("photo");
   const [name, setName] = useState("Student 1");
   const [pendingPages, setPendingPages] = useState<PickedImage[]>([]);
@@ -49,7 +68,10 @@ export default function OnboardingUploadPage() {
   const [error, setError] = useState<string | null>(null);
   const [rateLimited, setRateLimited] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
-  const [gradingProgress, setGradingProgress] = useState<string | null>(null);
+  const [gradingStudentId, setGradingStudentId] = useState<string | null>(null);
+  const [workProgress, setWorkProgress] = useState<{ percent: number; label: string } | null>(
+    null,
+  );
   const [parsePreset, setParsePreset] = useState<DocumentParsePreset>(() =>
     defaultPresetForSurface("student_ocr"),
   );
@@ -67,6 +89,9 @@ export default function OnboardingUploadPage() {
       setStudents(roster);
       setName(`Student ${roster.length + 1}`);
       setTypedAnswers(nextKeys.map(() => ""));
+      if (roster.length === 0) {
+        setPhase("capture");
+      }
     });
   }, []);
 
@@ -89,17 +114,15 @@ export default function OnboardingUploadPage() {
   }
 
   function onDoneCapturing() {
-    setPhase("form");
+    void saveStudent();
   }
 
   function onBackFromCapture() {
-    // Keep pending pages when backing out of capture during edit —
-    // only clear if we had nothing useful (user abandoned empty capture for new student).
-    if (!editingId && pendingPages.length === 0) {
-      setPhase("form");
+    if (!editingId && pendingPages.length === 0 && students.length === 0) {
+      setPhase("summary");
       return;
     }
-    setPhase("form");
+    setPhase("summary");
   }
 
   function resetCaptureForm(nextStudents: OnboardingStudentSubmission[]) {
@@ -109,15 +132,18 @@ export default function OnboardingUploadPage() {
     setTypedAnswers(keys.map(() => ""));
     setName(`Student ${nextStudents.length + 1}`);
     setError(null);
-    setPhase("form");
+    setPhase("summary");
   }
 
   function startEdit(student: OnboardingStudentSubmission) {
     setEditingId(student.id);
     setName(student.name);
     setMode(student.source);
+    setParsePreset(
+      coerceParsePreset(student.parsePreset, defaultPresetForSurface("student_ocr")),
+    );
     setError(null);
-    setPhase("form");
+    setPhase("capture");
     if (student.source === "typed") {
       setTypedAnswers(keys.map((_, i) => student.typedAnswers?.[i] ?? ""));
       setPendingPages([]);
@@ -127,16 +153,7 @@ export default function OnboardingUploadPage() {
     }
   }
 
-  function cancelEdit() {
-    resetCaptureForm(students);
-  }
-
   const apiBase = process.env.EXPO_PUBLIC_APP_URL;
-
-  const draftReady =
-    mode === "photo"
-      ? pendingPages.length > 0
-      : typedAnswers.some((a) => a.trim().length > 0);
 
   /** Persist the open form into the roster. Returns the updated list, or null on validation error. */
   async function commitCurrentForm(): Promise<OnboardingStudentSubmission[] | null> {
@@ -147,11 +164,14 @@ export default function OnboardingUploadPage() {
         : `Student ${students.length + 1}`);
     setError(null);
 
-    let submission: Pick<OnboardingStudentSubmission, "source" | "papers" | "typedAnswers">;
+    let submission: Pick<
+      OnboardingStudentSubmission,
+      "source" | "papers" | "typedAnswers" | "parsePreset"
+    >;
 
     if (mode === "photo") {
       if (pendingPages.length === 0) {
-        setError("Add at least one photo.");
+        setError("Add at least one photo or PDF.");
         return null;
       }
       const destDir = `${FileSystem.documentDirectory}onboarding/`;
@@ -166,17 +186,17 @@ export default function OnboardingUploadPage() {
         const alreadyPersisted = page.uri.startsWith(destDir);
         let destPath = page.uri;
         if (!alreadyPersisted) {
-          destPath = `${destDir}student_${Date.now()}_p${i + 1}.jpg`;
+          destPath = `${destDir}student_${Date.now()}_p${i + 1}.${fileExtension(page)}`;
           await FileSystem.copyAsync({ from: page.uri, to: destPath });
         }
         papers.push({
-          mimeType: page.type || "image/jpeg",
+          mimeType: isPdfPage(page) ? "application/pdf" : page.type || "image/jpeg",
           base64: "",
           fileUri: destPath,
           filename: page.name,
         });
       }
-      submission = { source: "photo", papers };
+      submission = { source: "photo", papers, parsePreset };
     } else {
       const trimmed = typedAnswers.map((a) => a.trim());
       if (!trimmed.some((a) => a.length > 0)) {
@@ -215,7 +235,10 @@ export default function OnboardingUploadPage() {
     }
   }
 
-  async function gradeOne(student: OnboardingStudentSubmission): Promise<OnboardingSampleGrade> {
+  async function gradeOne(
+    student: OnboardingStudentSubmission,
+    onProgress: (progress: { percent: number; label: string }) => void,
+  ): Promise<OnboardingSampleGrade> {
     if (!apiBase) throw new Error("Missing EXPO_PUBLIC_APP_URL.");
 
     const formData = new FormData();
@@ -232,7 +255,10 @@ export default function OnboardingUploadPage() {
     if (student.source === "typed" && student.typedAnswers) {
       formData.append("typedAnswers", JSON.stringify(student.typedAnswers));
     } else if (student.papers?.length) {
-      formData.append("parsePreset", parsePreset);
+      formData.append(
+        "parsePreset",
+        coerceParsePreset(student.parsePreset, parsePreset),
+      );
       for (const paper of student.papers) {
         const uri = paper.fileUri;
         if (!uri) throw new Error(`Missing photo for ${student.name}.`);
@@ -248,68 +274,60 @@ export default function OnboardingUploadPage() {
     }
 
     const sampleGradeUrl = new URL("/api/onboarding/sample-grade", apiBase).href;
-    const res = await fetch(sampleGradeUrl, { method: "POST", body: formData });
-    if (res.status === 429) throw new Error("RATE_LIMITED");
-    const payload = await res.json();
-    if (!res.ok) {
-      throw new Error(payload.error ?? `Couldn't grade ${student.name}.`);
+    const http = await postFormDataWithProgress({
+      url: sampleGradeUrl,
+      formData,
+      onProgress,
+    });
+    const { status, payload } = resultFromProgressHttp(http);
+    if (status === 429) throw new Error("RATE_LIMITED");
+    if (status < 200 || status >= 300) {
+      throw new Error(
+        (typeof payload.error === "string" && payload.error) || `Couldn't grade ${student.name}.`,
+      );
     }
     return {
-      marksEarned: payload.marksEarned,
-      maxMarks: payload.maxMarks,
-      feedback: payload.feedback,
-      ocrAnswerText: payload.ocrAnswerText,
-      questions: payload.questions,
+      marksEarned: Number(payload.marksEarned),
+      maxMarks: Number(payload.maxMarks),
+      feedback: String(payload.feedback ?? ""),
+      ocrAnswerText:
+        typeof payload.ocrAnswerText === "string" ? payload.ocrAnswerText : undefined,
+      questions: payload.questions as OnboardingSampleGrade["questions"],
     };
   }
 
-  async function gradeClass() {
+  async function gradeStudent(student: OnboardingStudentSubmission) {
     if (!apiBase) {
       setError("Missing EXPO_PUBLIC_APP_URL — add it in .env for this build.");
       return;
     }
-
-    // Include whoever is on the open form — no need to tap "Add student" first.
-    let roster = students;
-    if (editingId || draftReady) {
-      const next = await commitCurrentForm();
-      if (!next) return;
-      roster = next;
-      setStudents(next);
-      await setVault({ students: next, completedAt: undefined });
-      resetCaptureForm(next);
-    }
-    if (roster.length === 0) {
-      setError("Add at least one student first.");
-      return;
-    }
+    if (rateLimited || isBusy) return;
 
     setError(null);
     setIsBusy(true);
+    setGradingStudentId(student.id);
+    const label = `Grading ${student.name}`;
+    setWorkProgress({ percent: 0, label });
     try {
-      const graded: OnboardingStudentSubmission[] = [];
-      for (let i = 0; i < roster.length; i++) {
-        const student = roster[i];
-        setGradingProgress(`Grading ${student.name} (${i + 1}/${roster.length})…`);
-        if (
-          student.grade &&
-          Number.isInteger(student.grade.marksEarned) &&
-          Number.isInteger(student.grade.maxMarks)
-        ) {
-          graded.push(student);
-          continue;
-        }
-        const grade = await gradeOne(student);
-        graded.push({ ...student, grade });
-      }
-      setStudents(graded);
-      await setVault({ students: graded, completedAt: new Date().toISOString() });
-      router.push("/onboarding/result");
+      const grade = await gradeOne(student, (progress) => {
+        setWorkProgress({
+          percent: progress.percent,
+          label: progress.label ? `${label} · ${progress.label}` : label,
+        });
+      });
+      const next = students.map((entry) =>
+        entry.id === student.id ? { ...entry, grade } : entry,
+      );
+      setStudents(next);
+      await setVault({
+        students: next,
+        completedAt: new Date().toISOString(),
+      });
     } catch (err) {
       if (err instanceof Error && err.message === "RATE_LIMITED") {
         setRateLimited(true);
       } else {
-        console.error("[upload] gradeClass error:", err);
+        console.error("[upload] gradeStudent error:", err);
         setError(
           err instanceof Error
             ? err.message
@@ -318,81 +336,43 @@ export default function OnboardingUploadPage() {
       }
     } finally {
       setIsBusy(false);
-      setGradingProgress(null);
+      setGradingStudentId(null);
+      setWorkProgress(null);
     }
   }
 
+  function startNewStudent() {
+    if (students.length >= ONBOARDING_MAX_STUDENTS || isBusy) return;
+    setEditingId(null);
+    setPendingPages([]);
+    setMode("photo");
+    setTypedAnswers(keys.map(() => ""));
+    setName(`Student ${students.length + 1}`);
+    setParsePreset(defaultPresetForSurface("student_ocr"));
+    setError(null);
+    setPhase("capture");
+  }
+
   const atCap = students.length >= ONBOARDING_MAX_STUDENTS;
-  const isEditing = Boolean(editingId);
-  const showNewForm = !isEditing && !atCap;
-  const gradeCount = students.length + (draftReady && !isEditing ? 1 : 0);
-  const canGrade = gradeCount > 0 && !isBusy && !rateLimited;
+  const gradedCount = students.filter(isGraded).length;
 
-  function renderStudentForm(opts: { forEdit: boolean }) {
+  if (phase === "capture") {
     return (
-      <View className="gap-4">
-        <Text className="text-xs font-bold uppercase tracking-widest text-ink-faint">
-          {opts.forEdit ? "Editing student" : "New student"}
-        </Text>
-
-        <View className="gap-1.5">
-          <Text className="text-sm font-semibold text-ink">Student name</Text>
-          <TextInput
-            value={name}
-            onChangeText={setName}
-            editable={!isBusy}
-            className="rounded-2xl border border-line bg-cream px-4 py-3 text-base text-ink"
-          />
-        </View>
-
-        <View className="flex-row gap-2">
-          <TouchableOpacity
-            onPress={() => setMode("photo")}
-            disabled={isBusy}
-            className={`flex-1 items-center justify-center rounded-full px-4 py-3 ${mode === "photo" ? "bg-pen" : "border border-line bg-paper"}`}
-          >
-            <Text className={`text-sm font-semibold ${mode === "photo" ? "text-white" : "text-ink"}`}>
-              Photo
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => setMode("typed")}
-            disabled={isBusy}
-            className={`flex-1 items-center justify-center rounded-full px-4 py-3 ${mode === "typed" ? "bg-pen" : "border border-line bg-paper"}`}
-          >
-            <Text className={`text-sm font-semibold ${mode === "typed" ? "text-white" : "text-ink"}`}>
-              Type answer
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {mode === "photo" ? (
-          <View className="gap-3">
-            <ParsePresetPicker
-              surface="student_ocr"
-              value={parsePreset}
-              onChange={setParsePreset}
-              disabled={isBusy}
-            />
-            <TouchableOpacity
-              onPress={() => setPhase("capture")}
-              disabled={isBusy}
-              className="items-center rounded-2xl border-2 border-dashed border-line bg-cream py-8"
-            >
-              <Text className="text-sm font-bold text-ink">
-                {pendingPages.length === 0
-                  ? "Tap to capture pages"
-                  : `${pendingPages.length} page${pendingPages.length === 1 ? "" : "s"} — tap to review`}
-              </Text>
-              <Text className="mt-1 text-xs text-ink-faint">
-                Camera or photo library · reorder after
-              </Text>
+      <SafeAreaView className="flex-1 bg-cream px-4 pt-4">
+        {mode === "typed" ? (
+          <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
+            <TouchableOpacity onPress={onBackFromCapture} className="mb-4">
+              <Text className="text-sm font-medium text-ink-soft">Back</Text>
             </TouchableOpacity>
-          </View>
-        ) : (
-          <View className="gap-4">
+            <TextInput
+              value={name}
+              onChangeText={setName}
+              placeholder="Student name"
+              placeholderTextColor="#a3927b"
+              className="mb-4 rounded-2xl border border-line bg-paper px-4 py-3 text-base font-semibold text-ink"
+            />
             {keys.map((key, index) => (
-              <View key={`${index}-${key.prompt.slice(0, 24)}`} className="gap-1.5">
+              <View key={`${index}-${key.prompt.slice(0, 24)}`} className="mb-4 gap-1.5">
                 <Text className="text-sm font-semibold text-ink">
                   {keys.length === 1 ? "Student answer" : `Answer for Q${index + 1}`}
                 </Text>
@@ -406,7 +386,6 @@ export default function OnboardingUploadPage() {
                     next[index] = text;
                     setTypedAnswers(next);
                   }}
-                  editable={!isBusy}
                   multiline
                   placeholderTextColor="#9ca3af"
                   className="min-h-[72px] rounded-2xl border border-line bg-cream px-4 py-3 text-base text-ink"
@@ -414,49 +393,29 @@ export default function OnboardingUploadPage() {
                 />
               </View>
             ))}
-          </View>
-        )}
-
-        <View className="gap-2">
-          {opts.forEdit ? (
             <TouchableOpacity
-              onPress={cancelEdit}
-              disabled={isBusy}
-              className="items-center justify-center rounded-full border-2 border-line bg-paper px-8 py-3"
+              onPress={() => void saveStudent()}
+              className="items-center rounded-full bg-pen py-4"
             >
-              <Text className="text-base font-semibold text-ink-soft">Cancel</Text>
+              <Text className="text-base font-bold text-white">Done</Text>
             </TouchableOpacity>
-          ) : null}
-          <TouchableOpacity
-            onPress={() => void saveStudent()}
-            disabled={isBusy}
-            className="items-center justify-center rounded-full border-2 border-line bg-paper px-8 py-4"
-          >
-            <Text className="text-base font-semibold text-pen-deep">
-              {opts.forEdit ? "Save changes" : "Add student"}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }
-
-  if (phase === "capture") {
-    return (
-      <SafeAreaView className="flex-1 bg-cream px-4 pt-4">
-        <StepCapturePages
-          studentName={name.trim() || `Student ${students.length + 1}`}
-          pages={pendingPages}
-          parsePreset={parsePreset}
-          onParsePresetChange={setParsePreset}
-          onAddPage={onAddPage}
-          onRemovePage={onRemovePage}
-          onMovePage={onMovePage}
-          onDone={onDoneCapturing}
-          onBack={onBackFromCapture}
-          errorMessage=""
-          doneLabel={`Done — ${pendingPages.length} page${pendingPages.length === 1 ? "" : "s"} ready`}
-        />
+          </ScrollView>
+        ) : (
+          <StepCapturePages
+            studentName={name.trim() || `Student ${students.length + 1}`}
+            onStudentNameChange={setName}
+            pages={pendingPages}
+            parsePreset={parsePreset}
+            onParsePresetChange={setParsePreset}
+            onAddPage={onAddPage}
+            onRemovePage={onRemovePage}
+            onMovePage={onMovePage}
+            onDone={onDoneCapturing}
+            onBack={onBackFromCapture}
+            errorMessage={error ?? ""}
+            doneLabel={`Done with ${name.trim() || "this student"}`}
+          />
+        )}
       </SafeAreaView>
     );
   }
@@ -466,80 +425,115 @@ export default function OnboardingUploadPage() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
         <View className="items-center">
           <Text className="text-center font-display text-3xl font-semibold tracking-tight text-ink">
-            Add each student and their paper.
+            Capture papers, then grade each student.
           </Text>
           <Text className="mt-4 text-center text-base leading-relaxed text-ink-soft">
-            Collect all the papers first. Tap any student to edit. We&apos;ll grade everyone when
-            you&apos;re ready.
+            Same flow as the full app: add pages or a PDF, preview, then send that student off to
+            grade. Up to {ONBOARDING_MAX_STUDENTS} students in this demo.
           </Text>
         </View>
 
         {students.length > 0 ? (
           <View className="mt-8 gap-2">
             <Text className="text-xs font-bold uppercase tracking-widest text-ink-faint">
-              {students.length} student{students.length === 1 ? "" : "s"} ready
+              {students.length}/{ONBOARDING_MAX_STUDENTS} student{students.length === 1 ? "" : "s"}
             </Text>
             {students.map((s) => {
-              const active = editingId === s.id;
-              if (active) {
-                return (
-                  <View
-                    key={s.id}
-                    className="rounded-2xl border border-pen bg-paper p-5 shadow-paper"
-                  >
-                    {renderStudentForm({ forEdit: true })}
-                  </View>
-                );
-              }
+              const gradingThis = gradingStudentId === s.id;
+              const graded = isGraded(s);
+              const pageCount = s.source === "photo" ? (s.papers?.length ?? 0) : 0;
               return (
                 <View
                   key={s.id}
-                  className="flex-row items-center justify-between gap-3 rounded-2xl border border-line bg-paper p-4 shadow-paper"
+                  className="rounded-2xl border border-line bg-paper px-4 py-3 shadow-paper"
                 >
-                  <TouchableOpacity
-                    onPress={() => startEdit(s)}
-                    disabled={isBusy || isEditing}
-                    className="min-w-0 flex-1"
-                  >
-                    <Text className="text-sm font-bold text-ink" numberOfLines={1}>
-                      {s.name}
-                    </Text>
-                    <Text className="text-xs text-ink-faint">
-                      {s.source === "photo"
-                        ? `${s.papers?.length ?? 1} photo${(s.papers?.length ?? 1) === 1 ? "" : "s"}`
-                        : "Typed"}
-                      {isEditing ? "" : " · tap to edit"}
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => void removeStudent(s.id)}
-                    disabled={isBusy || isEditing}
-                    className="ml-2 rounded-full bg-pen-wash p-2"
-                  >
-                    <X size={16} color="#be3a2e" />
-                  </TouchableOpacity>
+                  <View className="flex-row items-center">
+                    <TouchableOpacity
+                      onPress={() => startEdit(s)}
+                      disabled={isBusy}
+                      className="min-w-0 flex-1 flex-row items-center"
+                    >
+                      <View className="mr-3 h-10 w-10 items-center justify-center rounded-full bg-pen-wash">
+                        <Text className="text-sm font-bold text-pen-deep">
+                          {s.name.charAt(0).toUpperCase()}
+                        </Text>
+                      </View>
+                      <View className="min-w-0 flex-1">
+                        <Text className="text-base font-semibold text-ink" numberOfLines={1}>
+                          {s.name}
+                        </Text>
+                        <Text className="text-xs text-ink-soft">
+                          {s.source === "photo"
+                            ? `${pageCount} page${pageCount === 1 ? "" : "s"} · tap to preview`
+                            : "Typed · tap to edit"}
+                          {graded
+                            ? ` · ${s.grade!.marksEarned}/${s.grade!.maxMarks}`
+                            : ""}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => void removeStudent(s.id)}
+                      disabled={isBusy}
+                      className="ml-2 rounded-full bg-pen-wash p-2"
+                    >
+                      <X size={16} color="#be3a2e" />
+                    </TouchableOpacity>
+                  </View>
+                  {gradingThis && workProgress ? (
+                    <DeterminateProgressBar
+                      className="mt-3"
+                      percent={workProgress.percent}
+                      label={workProgress.label}
+                    />
+                  ) : (
+                    <TouchableOpacity
+                      onPress={() => void gradeStudent(s)}
+                      disabled={isBusy || rateLimited}
+                      className={`mt-3 items-center rounded-full py-3 ${
+                        graded ? "border border-line bg-cream" : "bg-pen"
+                      }`}
+                    >
+                      <Text
+                        className={`text-sm font-semibold ${graded ? "text-pen-deep" : "text-white"}`}
+                      >
+                        {graded ? "Grade again" : "Grade this student"}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               );
             })}
           </View>
-        ) : null}
+        ) : (
+          <View className="mt-8 rounded-2xl border border-dashed border-line bg-paper p-5">
+            <Text className="text-sm font-semibold text-ink">No papers yet</Text>
+            <Text className="mt-1 text-xs text-ink-faint">
+              Capture photos or a PDF for the first student, then grade them on their own.
+            </Text>
+          </View>
+        )}
 
-        {atCap && !isEditing ? (
-          <View className="mt-8 rounded-2xl border border-line bg-paper p-5">
+        {atCap ? (
+          <View className="mt-4 rounded-2xl border border-line bg-paper p-4">
             <Text className="text-sm font-semibold text-ink">
-              That&apos;s the free demo limit ({ONBOARDING_MAX_STUDENTS} students).
+              Demo limit: {ONBOARDING_MAX_STUDENTS} students.
             </Text>
             <Text className="mt-1 text-xs text-ink-faint">
-              Tap a student above to edit, or sign up to grade a full class.
+              Grade each paper independently, then sign up to run a full class.
             </Text>
           </View>
-        ) : null}
-
-        {showNewForm ? (
-          <View className="mt-8 gap-4 rounded-2xl border border-line bg-paper p-5">
-            {renderStudentForm({ forEdit: false })}
-          </View>
-        ) : null}
+        ) : (
+          <TouchableOpacity
+            onPress={startNewStudent}
+            disabled={isBusy}
+            className="mt-6 items-center rounded-full border border-dashed border-pen/40 bg-pen-wash/20 py-3"
+          >
+            <Text className="text-sm font-semibold text-pen-deep">
+              {students.length === 0 ? "+ Add first student" : "+ Add another student"}
+            </Text>
+          </TouchableOpacity>
+        )}
 
         {error ? (
           <View className="mt-4 rounded-lg border border-pen-soft/60 bg-pen-wash px-3 py-2">
@@ -555,19 +549,17 @@ export default function OnboardingUploadPage() {
           </View>
         ) : null}
 
-        <TouchableOpacity
-          onPress={() => void gradeClass()}
-          disabled={!canGrade}
-          className={`mt-6 items-center justify-center rounded-full px-8 py-4 ${
-            !canGrade ? "bg-pen-soft" : "bg-pen active:bg-pen-deep"
-          }`}
-        >
-          <Text className="text-base font-semibold text-white">
-            {isBusy
-              ? gradingProgress ?? "Grading..."
-              : `Grade my class${gradeCount > 0 ? ` (${gradeCount})` : ""}`}
-          </Text>
-        </TouchableOpacity>
+        {gradedCount > 0 ? (
+          <TouchableOpacity
+            onPress={() => router.push("/onboarding/result")}
+            disabled={isBusy}
+            className="mt-6 items-center justify-center rounded-full bg-pen px-8 py-4 active:bg-pen-deep"
+          >
+            <Text className="text-base font-semibold text-white">
+              See results ({gradedCount})
+            </Text>
+          </TouchableOpacity>
+        ) : null}
       </ScrollView>
     </OnboardingShell>
   );

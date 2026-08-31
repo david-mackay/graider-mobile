@@ -1,10 +1,16 @@
 import { useState } from "react";
-import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
+import { useAuth } from "@clerk/clerk-expo";
 import * as DocumentPicker from "expo-document-picker";
 import { FileUp } from "lucide-react-native";
 import { Card } from "@/components/shared/ui";
+import DeterminateProgressBar from "@/components/shared/DeterminateProgressBar";
 import { GraiderApiError, handleJson } from "@/lib/dashboard-client";
-import { useGraiderFetch } from "@/lib/graider-fetch";
+import { resolveGraiderApiUrl, useGraiderFetch } from "@/lib/graider-fetch";
+import {
+  postFormDataWithProgress,
+  resultFromProgressHttp,
+} from "@/lib/upload-progress";
 import { appendDocumentToFormData, type PickedDocument } from "@/lib/picked-document";
 import ParsePresetPicker from "@/components/shared/ParsePresetPicker";
 import {
@@ -34,6 +40,8 @@ type ActiveImport = {
   clientId: string;
   label: string;
   phase: "uploading" | "processing";
+  percent: number;
+  statusLabel: string;
 };
 
 const ENDPOINTS: Record<ContentImportKind, string> = {
@@ -73,6 +81,7 @@ export default function PdfImportPanel({
   disabled = false,
 }: PdfImportPanelProps) {
   const graiderFetch = useGraiderFetch();
+  const { getToken } = useAuth();
   const [activeImports, setActiveImports] = useState<ActiveImport[]>([]);
   const surface = SURFACES[kind];
   const [parsePreset, setParsePreset] = useState<DocumentParsePreset>(() =>
@@ -108,20 +117,44 @@ export default function PdfImportPanel({
     const clientId = nextClientId();
     setActiveImports((prev) => [
       ...prev,
-      { clientId, label: doc.name, phase: "uploading" },
+      { clientId, label: doc.name, phase: "uploading", percent: 0, statusLabel: "Uploading…" },
     ]);
     try {
       const formData = new FormData();
       appendDocumentToFormData(formData, "pdf", doc);
       formData.append("parsePreset", preset);
-      const created = await handleJson<{ jobId: string; status: string }>(
-        await graiderFetch(`/api/classes/${classId}/${ENDPOINTS[kind]}`, {
-          method: "POST",
-          body: formData,
-        }),
-      );
-      updateImport(clientId, { phase: "processing" });
-      const finished = await pollJob(created.jobId);
+      const headers: Record<string, string> = {};
+      const token = await getToken();
+      if (token) headers.Authorization = `Bearer ${token}`;
+      const http = await postFormDataWithProgress({
+        url: resolveGraiderApiUrl(`/api/classes/${classId}/${ENDPOINTS[kind]}`),
+        formData,
+        headers,
+        onProgress: (progress) => {
+          updateImport(clientId, {
+            phase: "uploading",
+            percent: progress.percent,
+            statusLabel: progress.label,
+          });
+        },
+      });
+      const created = resultFromProgressHttp(http);
+      if (created.status < 200 || created.status >= 300) {
+        throw new GraiderApiError(
+          (typeof created.payload.error === "string" && created.payload.error) || "PDF import failed.",
+          created.status,
+        );
+      }
+      const jobId = typeof created.payload.jobId === "string" ? created.payload.jobId : null;
+      if (!jobId) {
+        throw new Error("PDF import did not return a job id.");
+      }
+      updateImport(clientId, { phase: "processing", percent: 45, statusLabel: "Processing…" });
+      const finished = await pollJob(jobId);
+      if (finished.status === "failed") {
+        throw new Error(finished.error ?? "PDF import failed.");
+      }
+      updateImport(clientId, { percent: 100, statusLabel: "Done" });
       if (finished.status === "failed") {
         throw new Error(finished.error ?? "PDF import failed.");
       }
@@ -175,11 +208,7 @@ export default function PdfImportPanel({
         disabled={disabled}
         className="mt-3 flex-row items-center justify-center gap-2 rounded-xl border border-line bg-paper py-3 disabled:opacity-50"
       >
-        {activeImports.length > 0 ? (
-          <ActivityIndicator color="#99291f" />
-        ) : (
-          <FileUp size={18} color="#99291f" />
-        )}
+        <FileUp size={18} color="#99291f" />
         <Text className="text-sm font-medium text-pen-deep">
           {activeImports.length > 0 ? "Add another PDF" : "Choose PDF"}
         </Text>
@@ -196,9 +225,14 @@ export default function PdfImportPanel({
                   {job.label}
                 </Text>
                 <Text className="text-[11px] text-ink-faint">
-                  {job.phase === "uploading" ? "Uploading…" : "Processing…"}
+                  {job.phase === "uploading" ? `${job.percent}%` : job.statusLabel}
                 </Text>
               </View>
+              <DeterminateProgressBar
+                className="mt-2"
+                percent={job.percent}
+                label={job.statusLabel}
+              />
             </View>
           ))}
         </View>

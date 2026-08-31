@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -8,8 +8,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  Animated,
-  Easing,
 } from "react-native";
 import { router } from "expo-router";
 import * as DocumentPicker from "expo-document-picker";
@@ -26,6 +24,11 @@ import {
 import { resolveGraiderApiUrl } from "@/lib/graider-fetch";
 import { appendDocumentToFormData } from "@/lib/picked-document";
 import ParsePresetPicker from "@/components/shared/ParsePresetPicker";
+import DeterminateProgressBar from "@/components/shared/DeterminateProgressBar";
+import {
+  postFormDataWithProgress,
+  resultFromProgressHttp,
+} from "@/lib/upload-progress";
 import {
   defaultPresetForSurface,
   type DocumentParsePreset,
@@ -34,6 +37,19 @@ import {
 const DEFAULT_PROMPT = "Name two functions of the mitochondria.";
 const DEFAULT_CORRECT_ANSWER =
   "Mitochondria produce ATP via cellular respiration, and they regulate cellular metabolism / signal apoptosis.";
+const MAX_STAGED_FILES = 10;
+
+type StagedUpload = {
+  id: string;
+  uri: string;
+  name: string;
+  mimeType: string;
+  kind: "pdf" | "image";
+};
+
+function stagedId(name: string, uri: string): string {
+  return `${name}-${uri}-${Math.random().toString(36).slice(2, 7)}`;
+}
 
 type ParseResponse = {
   questions?: OnboardingAnswerKey[];
@@ -50,44 +66,6 @@ function blankKey(): OnboardingAnswerKey {
     questionType: "open",
     choices: null,
   };
-}
-
-function ReadingProgressBar() {
-  const translateX = useRef(new Animated.Value(-1)).current;
-
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.timing(translateX, {
-        toValue: 1,
-        duration: 1150,
-        easing: Easing.inOut(Easing.ease),
-        useNativeDriver: true,
-      }),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [translateX]);
-
-  return (
-    <View className="mt-4 gap-2">
-      <Text className="text-xs font-semibold text-ink-soft">Reading your answer key…</Text>
-      <View className="h-1.5 overflow-hidden rounded-full bg-line">
-        <Animated.View
-          className="h-full w-2/5 rounded-full bg-pen"
-          style={{
-            transform: [
-              {
-                translateX: translateX.interpolate({
-                  inputRange: [-1, 1],
-                  outputRange: [-80, 220],
-                }),
-              },
-            ],
-          }}
-        />
-      </View>
-    </View>
-  );
 }
 
 function normalizeIncoming(raw: OnboardingAnswerKey[]): OnboardingAnswerKey[] {
@@ -111,9 +89,13 @@ export default function OnboardingAnswerKeyPage() {
   const [manualType, setManualType] = useState<"open" | "mcq">("open");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [workProgress, setWorkProgress] = useState<{ percent: number; label: string } | null>(
+    null,
+  );
   const [parsePreset, setParsePreset] = useState<DocumentParsePreset>(() =>
     defaultPresetForSurface("answer_key_pdf"),
   );
+  const [staged, setStaged] = useState<StagedUpload[]>([]);
 
   useEffect(() => {
     fireEvent(ONBOARDING_EVENTS.ANSWER_KEY);
@@ -151,24 +133,17 @@ export default function OnboardingAnswerKeyPage() {
     router.push("/onboarding/upload");
   }
 
-  async function handleParseResponse(res: Response) {
-    const raw = await res.text();
-    let payload: ParseResponse;
-    try {
-      payload = JSON.parse(raw) as ParseResponse;
-    } catch {
-      if (res.status === 413) {
+  async function handleParsePayload(status: number, payload: ParseResponse) {
+    const questions = normalizeIncoming(payload.questions ?? []);
+    const ok = status >= 200 && status < 300;
+    if (!ok) {
+      if (status === 413) {
         throw new Error("File is too large. Keep it under 4 MB, or add the key manually.");
       }
-      throw new Error(
-        "That upload didn't go through — the file may be too large or took too long. Try again or add the key manually.",
-      );
-    }
-    const questions = normalizeIncoming(payload.questions ?? []);
-    if (!res.ok) {
       if (payload.needsPhoto || questions.length === 0) {
         setKeys([blankKey()]);
         setMode("preview");
+        setStaged([]);
         setError(
           payload.error ??
             "We couldn't prefill from that file. Tweak the review below, or photograph the key.",
@@ -180,6 +155,7 @@ export default function OnboardingAnswerKeyPage() {
     if (questions.length === 0) {
       setKeys([blankKey()]);
       setMode("preview");
+      setStaged([]);
       setError("Nothing found — add questions in the review below.");
       return;
     }
@@ -187,6 +163,21 @@ export default function OnboardingAnswerKeyPage() {
     setTruncated(Boolean(payload.truncated));
     setMode("preview");
     setError(null);
+    setStaged([]);
+  }
+
+  function addStaged(items: StagedUpload[]) {
+    if (items.length === 0) return;
+    setError(null);
+    setStaged((prev) => {
+      const remaining = MAX_STAGED_FILES - prev.length;
+      if (remaining <= 0) return prev;
+      return [...prev, ...items.slice(0, remaining)];
+    });
+  }
+
+  function removeStaged(id: string) {
+    setStaged((prev) => prev.filter((item) => item.id !== id));
   }
 
   async function onPickPdf() {
@@ -195,31 +186,20 @@ export default function OnboardingAnswerKeyPage() {
       const result = await DocumentPicker.getDocumentAsync({
         type: "application/pdf",
         copyToCacheDirectory: true,
-        multiple: false,
+        multiple: true,
       });
-      if (result.canceled || !result.assets?.[0]) return;
-      const asset = result.assets[0];
-      setBusy(true);
-      setUploadName(asset.name);
-
-      const formData = new FormData();
-      appendDocumentToFormData(formData, "pdf", {
-        uri: asset.uri,
-        name: asset.name || "answer-key.pdf",
-        mimeType: asset.mimeType || "application/pdf",
-      });
-      formData.append("parsePreset", parsePreset);
-
-      const res = await fetch(resolveGraiderApiUrl("/api/onboarding/parse-answer-key"), {
-        method: "POST",
-        body: formData,
-      });
-      await handleParseResponse(res);
+      if (result.canceled || !result.assets?.length) return;
+      addStaged(
+        result.assets.map((asset) => ({
+          id: stagedId(asset.name || "answer-key.pdf", asset.uri),
+          uri: asset.uri,
+          name: asset.name || "answer-key.pdf",
+          mimeType: asset.mimeType || "application/pdf",
+          kind: "pdf" as const,
+        })),
+      );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not read that PDF.");
-      setUploadName(null);
-    } finally {
-      setBusy(false);
+      setError(err instanceof Error ? err.message : "Could not add that PDF.");
     }
   }
 
@@ -237,38 +217,62 @@ export default function OnboardingAnswerKeyPage() {
         quality: 0.85,
       });
       if (result.canceled || !result.assets?.length) return;
-      setBusy(true);
-      setUploadName(
-        result.assets.length === 1
-          ? result.assets[0].fileName ?? "answer-key.jpg"
-          : `${result.assets.length} photos`,
-      );
-
-      const formData = new FormData();
-      const preset =
-        parsePreset === "typed_pdf"
-          ? defaultPresetForSurface("answer_key_photo")
-          : parsePreset;
-      if (preset !== parsePreset) setParsePreset(preset);
-      result.assets.forEach((asset, index) => {
-        appendDocumentToFormData(formData, "image", {
+      if (parsePreset === "typed_pdf") {
+        setParsePreset(defaultPresetForSurface("answer_key_photo"));
+      }
+      addStaged(
+        result.assets.map((asset, index) => ({
+          id: stagedId(asset.fileName || `key-${index + 1}.jpg`, asset.uri),
           uri: asset.uri,
           name: asset.fileName || `key-${index + 1}.jpg`,
           mimeType: asset.mimeType || "image/jpeg",
-        });
-      });
-      formData.append("parsePreset", preset);
-
-      const res = await fetch(resolveGraiderApiUrl("/api/onboarding/parse-answer-key"), {
-        method: "POST",
-        body: formData,
-      });
-      await handleParseResponse(res);
+          kind: "image" as const,
+        })),
+      );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not read those photos.");
+      setError(err instanceof Error ? err.message : "Could not add those photos.");
+    }
+  }
+
+  async function onSubmitStaged() {
+    if (staged.length === 0) {
+      setError("Add at least one PDF or photo, then read the answer key.");
+      return;
+    }
+    setError(null);
+    setBusy(true);
+    const label = staged.length === 1 ? staged[0]!.name : `${staged.length} files`;
+    setUploadName(label);
+    setWorkProgress({ percent: 0, label: "Uploading…" });
+    try {
+      const formData = new FormData();
+      const hasImages = staged.some((item) => item.kind === "image");
+      const preset =
+        hasImages && parsePreset === "typed_pdf"
+          ? defaultPresetForSurface("answer_key_photo")
+          : parsePreset;
+      if (preset !== parsePreset) setParsePreset(preset);
+      for (const item of staged) {
+        appendDocumentToFormData(formData, item.kind === "pdf" ? "pdf" : "image", {
+          uri: item.uri,
+          name: item.name,
+          mimeType: item.mimeType,
+        });
+      }
+      formData.append("parsePreset", preset);
+      const http = await postFormDataWithProgress({
+        url: resolveGraiderApiUrl("/api/onboarding/parse-answer-key"),
+        formData,
+        onProgress: setWorkProgress,
+      });
+      const { status, payload } = resultFromProgressHttp(http);
+      await handleParsePayload(status, payload as ParseResponse);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not read that answer key.");
       setUploadName(null);
     } finally {
       setBusy(false);
+      setWorkProgress(null);
     }
   }
 
@@ -348,7 +352,7 @@ export default function OnboardingAnswerKeyPage() {
                   Upload your answer key
                 </Text>
                 <Text className="mt-2 text-sm leading-relaxed text-ink-soft">
-                  PDF for typed keys, or a photo if answers are circled / the PDF is a scan.
+                  Add one or more PDFs or photos, then read them together.
                 </Text>
                 <View className="mt-4">
                   <ParsePresetPicker
@@ -361,16 +365,10 @@ export default function OnboardingAnswerKeyPage() {
                 <TouchableOpacity
                   onPress={() => void onPickPdf()}
                   disabled={busy}
-                  className="mt-4 items-center justify-center rounded-full bg-pen px-8 py-4 shadow-paper active:bg-pen-deep"
+                  className="mt-4 items-center justify-center rounded-full border border-line bg-cream px-8 py-3.5 active:bg-cream-deep"
                   style={busy ? { opacity: 0.6 } : undefined}
                 >
-                  <Text className="text-base font-semibold text-white">
-                    {busy
-                      ? "Reading…"
-                      : uploadName?.endsWith(".pdf")
-                        ? `Replace · ${uploadName}`
-                        : "Choose PDF"}
-                  </Text>
+                  <Text className="text-base font-semibold text-pen-deep">Add PDF(s)</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={() => void onPickPhotos()}
@@ -378,15 +376,44 @@ export default function OnboardingAnswerKeyPage() {
                   className="mt-2 items-center justify-center rounded-full border border-line bg-cream px-8 py-3.5 active:bg-cream-deep"
                   style={busy ? { opacity: 0.6 } : undefined}
                 >
-                  <Text className="text-base font-semibold text-pen-deep">
-                    {busy ? "Reading…" : "Upload photo(s)"}
+                  <Text className="text-base font-semibold text-pen-deep">Add photo(s)</Text>
+                </TouchableOpacity>
+                {staged.length > 0 ? (
+                  <View className="mt-3 gap-2">
+                    {staged.map((item) => (
+                      <View
+                        key={item.id}
+                        className="flex-row items-center justify-between gap-2 rounded-lg border border-line bg-cream/60 px-3 py-2"
+                      >
+                        <Text className="flex-1 text-xs font-medium text-ink" numberOfLines={1}>
+                          {item.name}
+                        </Text>
+                        <Pressable disabled={busy} onPress={() => removeStaged(item.id)}>
+                          <Text className="text-xs font-bold text-ink-faint">Remove</Text>
+                        </Pressable>
+                      </View>
+                    ))}
+                  </View>
+                ) : null}
+                <TouchableOpacity
+                  onPress={() => void onSubmitStaged()}
+                  disabled={busy || staged.length === 0}
+                  className="mt-3 items-center justify-center rounded-full bg-pen px-8 py-4 shadow-paper active:bg-pen-deep"
+                  style={busy || staged.length === 0 ? { opacity: 0.6 } : undefined}
+                >
+                  <Text className="text-base font-semibold text-white">
+                    {busy
+                      ? "Reading…"
+                      : staged.length > 1
+                        ? `Read ${staged.length} files`
+                        : "Read answer key"}
                   </Text>
                 </TouchableOpacity>
-                {busy ? (
-                  <ReadingProgressBar />
+                {busy && workProgress ? (
+                  <DeterminateProgressBar percent={workProgress.percent} label={workProgress.label} />
                 ) : (
                   <Text className="mt-2 text-xs text-ink-faint">
-                    {"Circled answers? Photograph the marked key — circles aren't in PDF text."}
+                    {"Keep each file under 4 MB. Circled answers? Photograph the marked key."}
                   </Text>
                 )}
               </View>

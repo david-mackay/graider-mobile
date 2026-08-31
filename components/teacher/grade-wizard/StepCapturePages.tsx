@@ -7,6 +7,7 @@ import {
   Alert,
   Modal,
   StatusBar,
+  TextInput,
   PanResponder,
   Animated,
   type GestureResponderEvent,
@@ -15,7 +16,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ChevronLeft, X } from "lucide-react-native";
 import * as DocumentPicker from "expo-document-picker";
-import * as ImagePicker from "expo-image-picker";
+import * as Print from "expo-print";
 import { useCallback, useRef, useState } from "react";
 import { Card } from "@/components/shared/ui";
 import ParsePresetPicker from "@/components/shared/ParsePresetPicker";
@@ -45,8 +46,8 @@ type StepCapturePagesProps = {
   errorMessage: string;
   parsePreset: DocumentParsePreset;
   onParsePresetChange: (preset: DocumentParsePreset) => void;
-  /** Override the label on the "Done" button. Defaults to "Done with {studentName}". */
-  doneLabel?: string;
+  /** When set, the header name is editable (onboarding capture). */
+  onStudentNameChange?: (name: string) => void;
 };
 
 function acceptedPages(assets: ImagePicker.ImagePickerAsset[]): PickedImage[] {
@@ -421,6 +422,7 @@ export default function StepCapturePages({
   parsePreset,
   onParsePresetChange,
   doneLabel,
+  onStudentNameChange,
 }: StepCapturePagesProps) {
   const insets = useSafeAreaInsets();
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
@@ -509,7 +511,17 @@ export default function StepCapturePages({
           <ChevronLeft size={20} color="#6f6151" />
           <Text className="text-sm font-medium text-ink-soft">Back</Text>
         </TouchableOpacity>
-        <Text className="text-sm font-semibold text-ink">{studentName}</Text>
+        {onStudentNameChange ? (
+          <TextInput
+            value={studentName}
+            onChangeText={onStudentNameChange}
+            placeholder="Student name"
+            placeholderTextColor="#a3927b"
+            className="min-w-[40%] max-w-[55%] rounded-xl border border-line bg-paper px-2 py-1 text-center text-sm font-semibold text-ink"
+          />
+        ) : (
+          <Text className="text-sm font-semibold text-ink">{studentName}</Text>
+        )}
         <Text className="text-xs text-ink-faint">
           {pages.length}/{MAX_PAGES_PER_STUDENT}
         </Text>
@@ -677,6 +689,20 @@ export default function StepCapturePages({
               <Text style={{ color: "white", fontSize: 16, fontWeight: "600", textAlign: "center" }}>
                 {previewPage.name}
               </Text>
+              <TouchableOpacity
+                onPress={() => void Print.printAsync({ uri: previewPage.uri })}
+                style={{
+                  marginTop: 24,
+                  backgroundColor: "white",
+                  borderRadius: 999,
+                  paddingHorizontal: 24,
+                  paddingVertical: 12,
+                }}
+              >
+                <Text style={{ color: "#be3a2e", fontSize: 15, fontWeight: "700" }}>
+                  View full screen
+                </Text>
+              </TouchableOpacity>
             </View>
           ) : previewPage ? (
             <Image source={{ uri: previewPage.uri }} style={{ flex: 1 }} resizeMode="contain" />

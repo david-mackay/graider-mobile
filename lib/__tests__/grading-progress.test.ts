@@ -1,6 +1,7 @@
 import {
   buildStudentGradingProgress,
   gradingProgressHeadline,
+  gradingProgressPercent,
 } from "@/lib/grading-progress";
 import type { GradeStackJob } from "@/lib/types";
 
@@ -31,6 +32,24 @@ describe("buildStudentGradingProgress", () => {
     const progress = buildStudentGradingProgress(students, previewJob("processing"), "preview");
     expect(progress.every((entry) => entry.status === "processing")).toBe(true);
     expect(progress[0]?.detail).toBe("Reading pages");
+  });
+
+  it("uses completed student ids during preview OCR", () => {
+    const job: GradeStackJob = {
+      ...previewJob("processing"),
+      preview: {
+        pages: [],
+        progress: {
+          total: 2,
+          completed: 1,
+          currentStudentId: "s2",
+          completedStudentIds: ["s1"],
+        },
+      },
+    };
+    const progress = buildStudentGradingProgress(students, job, "preview");
+    expect(progress[0]).toMatchObject({ status: "done", detail: "Pages read" });
+    expect(progress[1]).toMatchObject({ status: "processing", detail: "Reading pages" });
   });
 
   it("shows per-student scores as commit completes", () => {
@@ -81,5 +100,30 @@ describe("gradingProgressHeadline", () => {
     expect(gradingProgressHeadline(progress, "commit", previewJob("processing"))).toContain(
       "Grading students",
     );
+  });
+
+  it("computes a determinate percent from commit progress", () => {
+    const progress = buildStudentGradingProgress(
+      students,
+      {
+        ...previewJob("processing"),
+        phase: "commit",
+        status: "processing",
+        commit: {
+          results: [],
+          progress: { total: 2, completed: 1, currentStudentId: "s2" },
+        },
+      },
+      "commit",
+    );
+    expect(gradingProgressPercent(progress, "commit", {
+      ...previewJob("processing"),
+      phase: "commit",
+      status: "processing",
+      commit: {
+        results: [],
+        progress: { total: 2, completed: 1, currentStudentId: "s2" },
+      },
+    })).toBe(50);
   });
 });

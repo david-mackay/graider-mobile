@@ -232,6 +232,7 @@ export type GradeStackPreviewPayload = {
   questionMatches?: GradeStackQuestionMatch[];
   discovery?: StackTestDiscovery | null;
   studentPageAssignments?: StudentPageAssignment[];
+  progress?: GradeStackCommitProgress;
 };
 
 export type StudentPageAssignment = {
@@ -250,6 +251,7 @@ export type GradeStackCommitProgress = {
   total: number;
   completed: number;
   currentStudentId?: string | null;
+  completedStudentIds?: string[];
 };
 
 export type GradeStackCommitPayload = {

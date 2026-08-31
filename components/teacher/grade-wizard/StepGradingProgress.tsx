@@ -1,7 +1,8 @@
-import { ActivityIndicator, View, Text } from "react-native";
+import { View, Text } from "react-native";
 import { Card } from "@/components/shared/ui";
+import DeterminateProgressBar from "@/components/shared/DeterminateProgressBar";
 import type { StudentGradingProgress } from "@/lib/grading-progress";
-import { gradingProgressHeadline } from "@/lib/grading-progress";
+import { gradingProgressHeadline, gradingProgressPercent } from "@/lib/grading-progress";
 import type { GradeStackJob } from "@/lib/types";
 import type { GradingPhase } from "@/lib/grading-progress";
 
@@ -47,6 +48,7 @@ export default function StepGradingProgress({
   errorMessage,
 }: StepGradingProgressProps) {
   const headline = gradingProgressHeadline(students, phase, activeJob);
+  const percent = gradingProgressPercent(students, phase, activeJob);
   const phaseLabel = phase === "preview" ? "Reading pages" : "Grading";
 
   return (
@@ -55,6 +57,7 @@ export default function StepGradingProgress({
         <Text className="text-xs font-semibold uppercase tracking-wide text-ink-faint">{phaseLabel}</Text>
         <Text className="mt-1 text-base font-semibold text-ink">{testTitle}</Text>
         <Text className="mt-2 text-sm text-ink-soft">{headline}</Text>
+        <DeterminateProgressBar className="mt-3" percent={percent} label={headline} />
         <Text className="mt-1 text-xs text-ink-faint">
           You can leave this screen — we'll notify you when it's ready.
         </Text>
@@ -84,9 +87,6 @@ export default function StepGradingProgress({
               </Text>
             </View>
             <View className="items-end gap-1">
-              {student.status === "processing" ? (
-                <ActivityIndicator size="small" color="#99291f" />
-              ) : null}
               <Text className={`text-xs font-semibold ${statusColor(student.status)}`}>
                 {statusLabel(student.status)}
               </Text>
