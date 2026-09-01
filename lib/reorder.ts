@@ -34,3 +34,39 @@ export function dropIndexForOffset(from: number, dy: number, heights: number[]):
   }
   return best;
 }
+
+/** Index whose vertical midpoint is closest to the finger. */
+export function indexFromWindowMids(pageY: number, mids: number[]): number {
+  if (mids.length === 0) return 0;
+  let best = 0;
+  let bestDist = Infinity;
+  for (let i = 0; i < mids.length; i += 1) {
+    const dist = Math.abs(mids[i] - pageY);
+    if (dist < bestDist) {
+      bestDist = dist;
+      best = i;
+    }
+  }
+  return best;
+}
+
+/** Pixels to scroll this frame when the finger is in the viewport's top/bottom edge. */
+export function scrollDeltaForEdge(
+  fingerY: number,
+  viewportTop: number,
+  viewportHeight: number,
+  edge = 72,
+  maxSpeed = 22,
+): number {
+  if (viewportHeight <= 0 || edge <= 0) return 0;
+  const viewportBottom = viewportTop + viewportHeight;
+  if (fingerY < viewportTop + edge) {
+    const t = Math.min(1, (viewportTop + edge - fingerY) / edge);
+    return -Math.max(1, Math.round(t * maxSpeed));
+  }
+  if (fingerY > viewportBottom - edge) {
+    const t = Math.min(1, (fingerY - (viewportBottom - edge)) / edge);
+    return Math.max(1, Math.round(t * maxSpeed));
+  }
+  return 0;
+}
