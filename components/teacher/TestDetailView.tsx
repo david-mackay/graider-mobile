@@ -1,6 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
-  Animated,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -11,10 +10,7 @@ import {
 import { useRouter } from "expo-router";
 import { Badge, Card, SectionHeader, btnPrimary, btnSecondary } from "@/components/shared/ui";
 import AttemptBreakdownCard from "@/components/teacher/AttemptBreakdownCard";
-import TestStructureEditor, {
-  LiftedQuestionCard,
-  type LiftedQuestion,
-} from "@/components/teacher/TestStructureEditor";
+import TestStructureEditor from "@/components/teacher/TestStructureEditor";
 import { handleJson } from "@/lib/dashboard-client";
 import { useGraiderFetch } from "@/lib/graider-fetch";
 import type { ClassMember, DashboardAttempt, GradedAttemptDetail } from "@/lib/dashboard-types";
@@ -62,13 +58,6 @@ export default function TestDetailView({
   const [selectedAttemptDetail, setSelectedAttemptDetail] = useState<GradedAttemptDetail | null>(null);
 
   const [isAdminBusy, setIsAdminBusy] = useState(false);
-  const [structureDragging, setStructureDragging] = useState(false);
-  const [lifted, setLifted] = useState<LiftedQuestion | null>(null);
-  const hostRef = useRef<View>(null);
-  const scrollRef = useRef<ScrollView>(null);
-  const scrollOffsetRef = useRef(0);
-  const liftX = useRef(new Animated.Value(0)).current;
-  const liftY = useRef(new Animated.Value(0)).current;
 
   const hasContext = Boolean(testId);
 
@@ -171,20 +160,14 @@ export default function TestDetailView({
   const pendingCount = attempts.filter((a) => a.status === "submitted").length;
 
   return (
-    <View ref={hostRef} collapsable={false} className="flex-1 bg-cream">
+    <View className="flex-1 bg-cream">
     <KeyboardAvoidingView
       className="flex-1"
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
     <ScrollView
-      ref={scrollRef}
       className="flex-1 bg-cream px-4 py-4"
       keyboardShouldPersistTaps="handled"
-      scrollEnabled={!structureDragging}
-      scrollEventThrottle={16}
-      onScroll={(event) => {
-        scrollOffsetRef.current = event.nativeEvent.contentOffset.y;
-      }}
     >
       <SectionHeader
         title={test?.title ?? "Test details"}
@@ -267,14 +250,6 @@ export default function TestDetailView({
               graiderFetch={graiderFetch}
               onChanged={() => loadData({ silent: true })}
               onError={setError}
-              onDraggingChange={setStructureDragging}
-              scrollRef={scrollRef}
-              scrollOffsetRef={scrollOffsetRef}
-              hostRef={hostRef}
-              liftX={liftX}
-              liftY={liftY}
-              onLiftStart={setLifted}
-              onLiftEnd={() => setLifted(null)}
             />
           ) : null}
 
@@ -315,19 +290,6 @@ export default function TestDetailView({
       )}
     </ScrollView>
     </KeyboardAvoidingView>
-    {lifted ? (
-      <Animated.View
-        pointerEvents="none"
-        style={{
-          position: "absolute",
-          width: lifted.width,
-          zIndex: 80,
-          transform: [{ translateX: liftX }, { translateY: liftY }, { scale: 1.04 }],
-        }}
-      >
-        <LiftedQuestionCard row={lifted.row} index={lifted.index} />
-      </Animated.View>
-    ) : null}
     {selectedAttemptDetail ? (
       <AttemptBreakdownCard
         attempt={selectedAttemptDetail}

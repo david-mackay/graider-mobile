@@ -9,11 +9,12 @@ import { handleJson } from "@/lib/dashboard-client";
 import { useGraiderFetch } from "@/lib/graider-fetch";
 import { getStoredClassId } from "@/lib/class-preference";
 import type { DashboardClass } from "@/lib/dashboard-types";
-import type { TestSummary } from "@/lib/types";
+import type { ResumableGradeJob, TestSummary } from "@/lib/types";
 
 type StepPickTestProps = {
   onSelect: (test: TestSummary) => void;
   onSelectAutoGrade: (classId: string, className: string) => void;
+  onResumeJob?: (jobId: string) => void;
   showSmartGrade?: boolean;
 };
 
@@ -23,7 +24,12 @@ type GroupedTests = {
   tests: TestSummary[];
 };
 
-export default function StepPickTest({ onSelect, onSelectAutoGrade, showSmartGrade = false }: StepPickTestProps) {
+export default function StepPickTest({
+  onSelect,
+  onSelectAutoGrade,
+  onResumeJob,
+  showSmartGrade = false,
+}: StepPickTestProps) {
   const router = useRouter();
   const graiderFetch = useGraiderFetch();
   const [tests, setTests] = useState<TestSummary[]>([]);
@@ -34,6 +40,7 @@ export default function StepPickTest({ onSelect, onSelectAutoGrade, showSmartGra
   const [search, setSearch] = useState("");
   const [createForClass, setCreateForClass] = useState<{ id: string; name: string } | null>(null);
   const [statusMessage, setStatusMessage] = useState("");
+  const [openJobs, setOpenJobs] = useState<ResumableGradeJob[]>([]);
 
   const teacherClasses = useMemo(
     () => classes.filter((c) => c.role_in_class === "teacher"),
@@ -60,15 +67,19 @@ export default function StepPickTest({ onSelect, onSelectAutoGrade, showSmartGra
       setIsLoading(true);
       setLoadError("");
       try {
-        const [testsPayload, classesPayload, storedClassId] = await Promise.all([
+        const [testsPayload, classesPayload, storedClassId, jobsPayload] = await Promise.all([
           handleJson<{ tests: TestSummary[] }>(await graiderFetch("/api/tests", { cache: "no-store" })),
           handleJson<{ classes: DashboardClass[] }>(await graiderFetch("/api/classes", { cache: "no-store" })),
           getStoredClassId(),
+          handleJson<{ jobs: ResumableGradeJob[] }>(
+            await graiderFetch("/api/grade-stack/jobs", { cache: "no-store" }),
+          ).catch(() => ({ jobs: [] as ResumableGradeJob[] })),
         ]);
         if (cancelled) return;
         setTests(testsPayload.tests ?? []);
         setClasses(classesPayload.classes ?? []);
         setPreferredClassId(storedClassId);
+        setOpenJobs(jobsPayload.jobs ?? []);
       } catch (error) {
         if (cancelled) return;
         setLoadError(error instanceof Error ? error.message : "Failed to load tests.");
@@ -136,6 +147,38 @@ export default function StepPickTest({ onSelect, onSelectAutoGrade, showSmartGra
       {statusMessage ? (
         <Card className="border-moss/30 bg-moss-wash">
           <Text className="text-sm text-moss-deep">{statusMessage}</Text>
+        </Card>
+      ) : null}
+
+      {onResumeJob && openJobs.length > 0 ? (
+        <Card className="border-pen/20 bg-pen-wash/30">
+          <Text className="text-sm font-bold text-ink">Papers waiting to grade</Text>
+          <Text className="mt-1 text-xs text-ink-soft">
+            OCR already ran. Open a session to review answers instead of scanning again.
+          </Text>
+          <View className="mt-3 gap-2">
+            {openJobs.map((job) => (
+              <View
+                key={job.id}
+                className="flex-row items-center justify-between gap-3 rounded-xl border border-line bg-paper px-3 py-2"
+              >
+                <View className="min-w-0 flex-1">
+                  <Text className="text-sm font-semibold text-ink" numberOfLines={1}>
+                    {job.testTitle}
+                  </Text>
+                  <Text className="text-xs text-ink-faint">
+                    {job.pageCount} page{job.pageCount === 1 ? "" : "s"}
+                    {job.studentCount > 0
+                      ? ` · ${job.studentCount} student${job.studentCount === 1 ? "" : "s"}`
+                      : ""}
+                  </Text>
+                </View>
+                <Pressable className={btnPrimary} onPress={() => onResumeJob(job.id)}>
+                  <Text className="text-sm font-bold text-white">Continue</Text>
+                </Pressable>
+              </View>
+            ))}
+          </View>
         </Card>
       ) : null}
 

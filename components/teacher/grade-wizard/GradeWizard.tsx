@@ -303,6 +303,7 @@ export default function GradeWizard() {
           <StepPickTest
             onSelect={actions.selectTest}
             onSelectAutoGrade={handleSelectAutoGrade}
+            onResumeJob={(jobId) => void actions.resumeFromJob(jobId)}
             showSmartGrade={false}
           />
         ) : null}
