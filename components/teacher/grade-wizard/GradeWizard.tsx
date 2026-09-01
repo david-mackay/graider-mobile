@@ -353,8 +353,6 @@ export default function GradeWizard() {
           <StepCapturePages
             studentName={activeStudent.studentName}
             pages={activeStudent.pages}
-            parsePreset={activeStudent.parsePreset}
-            onParsePresetChange={(preset) => actions.setParsePreset(preset)}
             onAddPage={actions.addPageToActive}
             onRemovePage={actions.removePageFromActive}
             onMovePage={actions.movePageInActive}
@@ -373,7 +371,6 @@ export default function GradeWizard() {
                 ? autoClassName ?? "Smart grade session"
                 : selectedTest!.title
             }
-            onParsePresetChange={(preset, studentId) => actions.setParsePreset(preset, studentId)}
             onAddStudent={actions.startAddStudent}
             onResumeStudent={actions.resumeStudent}
             onRemoveStudent={actions.removeBucket}

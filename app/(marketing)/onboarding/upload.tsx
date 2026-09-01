@@ -24,11 +24,7 @@ import {
   postFormDataWithProgress,
   resultFromProgressHttp,
 } from "@/lib/upload-progress";
-import {
-  defaultPresetForSurface,
-  coerceParsePreset,
-  type DocumentParsePreset,
-} from "@/lib/parse-presets";
+import { UNIFIED_PARSE_PRESET } from "@/lib/parse-presets";
 
 function papersToPickedImages(papers: OnboardingPaper[]): PickedImage[] {
   return papers
@@ -71,9 +67,6 @@ export default function OnboardingUploadPage() {
   const [gradingStudentId, setGradingStudentId] = useState<string | null>(null);
   const [workProgress, setWorkProgress] = useState<{ percent: number; label: string } | null>(
     null,
-  );
-  const [parsePreset, setParsePreset] = useState<DocumentParsePreset>(() =>
-    defaultPresetForSurface("student_ocr"),
   );
 
   useEffect(() => {
@@ -139,9 +132,6 @@ export default function OnboardingUploadPage() {
     setEditingId(student.id);
     setName(student.name);
     setMode(student.source);
-    setParsePreset(
-      coerceParsePreset(student.parsePreset, defaultPresetForSurface("student_ocr")),
-    );
     setError(null);
     setPhase("capture");
     if (student.source === "typed") {
@@ -196,7 +186,7 @@ export default function OnboardingUploadPage() {
           filename: page.name,
         });
       }
-      submission = { source: "photo", papers, parsePreset };
+      submission = { source: "photo", papers, parsePreset: UNIFIED_PARSE_PRESET };
     } else {
       const trimmed = typedAnswers.map((a) => a.trim());
       if (!trimmed.some((a) => a.length > 0)) {
@@ -257,7 +247,7 @@ export default function OnboardingUploadPage() {
     } else if (student.papers?.length) {
       formData.append(
         "parsePreset",
-        coerceParsePreset(student.parsePreset, parsePreset),
+        UNIFIED_PARSE_PRESET,
       );
       for (const paper of student.papers) {
         const uri = paper.fileUri;
@@ -348,7 +338,6 @@ export default function OnboardingUploadPage() {
     setMode("photo");
     setTypedAnswers(keys.map(() => ""));
     setName(`Student ${students.length + 1}`);
-    setParsePreset(defaultPresetForSurface("student_ocr"));
     setError(null);
     setPhase("capture");
   }
@@ -405,8 +394,6 @@ export default function OnboardingUploadPage() {
             studentName={name.trim() || `Student ${students.length + 1}`}
             onStudentNameChange={setName}
             pages={pendingPages}
-            parsePreset={parsePreset}
-            onParsePresetChange={setParsePreset}
             onAddPage={onAddPage}
             onRemovePage={onRemovePage}
             onMovePage={onMovePage}

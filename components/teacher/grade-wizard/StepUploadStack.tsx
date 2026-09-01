@@ -2,11 +2,7 @@ import { View, Text, Image, TouchableOpacity } from "react-native";
 import ImagePickerButton from "@/components/shared/ImagePickerButton";
 import { useMemo, useState } from "react";
 import { Card, btnPrimary, btnSecondary } from "@/components/shared/ui";
-import ParsePresetPicker from "@/components/shared/ParsePresetPicker";
-import {
-  defaultPresetForSurface,
-  type DocumentParsePreset,
-} from "@/lib/parse-presets";
+import { UNIFIED_PARSE_PRESET, type DocumentParsePreset } from "@/lib/parse-presets";
 import {
   isAcceptedImageType,
   pickedImageKey,
@@ -38,9 +34,6 @@ export default function StepUploadStack({
 }: StepUploadStackProps) {
   const [staged, setStaged] = useState<PickedImage[]>([]);
   const [localError, setLocalError] = useState<string>("");
-  const [parsePreset, setParsePreset] = useState<DocumentParsePreset>(() =>
-    defaultPresetForSurface("grade_stack"),
-  );
 
   const combinedError = errorMessage || localError;
 
@@ -108,7 +101,7 @@ export default function StepUploadStack({
       setLocalError("Add at least one image to continue.");
       return;
     }
-    void onSubmit(staged, parsePreset);
+    void onSubmit(staged, UNIFIED_PARSE_PRESET);
   }
 
   const submitDisabled = useMemo(
@@ -138,15 +131,6 @@ export default function StepUploadStack({
           <Text className="text-xs text-ink-faint">
             {staged.length} / {MAX_IMAGES} images
           </Text>
-        </View>
-
-        <View className="mb-4">
-          <ParsePresetPicker
-            surface="grade_stack"
-            value={parsePreset}
-            onChange={setParsePreset}
-            disabled={isBusy}
-          />
         </View>
 
         <View className="items-center justify-center rounded-xl border-2 border-dashed border-line bg-pen-wash/30 px-6 py-8">

@@ -12,12 +12,7 @@ import {
   resultFromProgressHttp,
 } from "@/lib/upload-progress";
 import { appendDocumentToFormData, type PickedDocument } from "@/lib/picked-document";
-import ParsePresetPicker from "@/components/shared/ParsePresetPicker";
-import {
-  defaultPresetForSurface,
-  type DocumentParsePreset,
-  type ParseSurface,
-} from "@/lib/parse-presets";
+import { UNIFIED_PARSE_PRESET } from "@/lib/parse-presets";
 
 export type ContentImportKind = "question_bank" | "test";
 
@@ -49,11 +44,6 @@ const ENDPOINTS: Record<ContentImportKind, string> = {
   test: "tests/import",
 };
 
-const SURFACES: Record<ContentImportKind, ParseSurface> = {
-  question_bank: "question_bank_import",
-  test: "test_import",
-};
-
 const LABELS: Record<ContentImportKind, { title: string; success: string }> = {
   question_bank: {
     title: "Import from PDF",
@@ -83,10 +73,6 @@ export default function PdfImportPanel({
   const graiderFetch = useGraiderFetch();
   const { getToken } = useAuth();
   const [activeImports, setActiveImports] = useState<ActiveImport[]>([]);
-  const surface = SURFACES[kind];
-  const [parsePreset, setParsePreset] = useState<DocumentParsePreset>(() =>
-    defaultPresetForSurface(surface),
-  );
   const labels = LABELS[kind];
 
   function updateImport(clientId: string, patch: Partial<ActiveImport>) {
@@ -113,7 +99,7 @@ export default function PdfImportPanel({
     throw new Error("Import is taking longer than expected. Check back in a moment.");
   }
 
-  async function uploadPdf(doc: PickedDocument, preset: DocumentParsePreset) {
+  async function uploadPdf(doc: PickedDocument) {
     const clientId = nextClientId();
     setActiveImports((prev) => [
       ...prev,
@@ -122,7 +108,7 @@ export default function PdfImportPanel({
     try {
       const formData = new FormData();
       appendDocumentToFormData(formData, "pdf", doc);
-      formData.append("parsePreset", preset);
+      formData.append("parsePreset", UNIFIED_PARSE_PRESET);
       const headers: Record<string, string> = {};
       const token = await getToken();
       if (token) headers.Authorization = `Bearer ${token}`;
@@ -188,21 +174,12 @@ export default function PdfImportPanel({
         name: asset.name ?? "import.pdf",
         mimeType: asset.mimeType ?? "application/pdf",
       },
-      parsePreset,
     );
   }
 
   return (
     <Card className="border-dashed border-line bg-cream/30">
       <Text className="text-sm font-semibold text-ink">{labels.title}</Text>
-      <View className="mt-3">
-        <ParsePresetPicker
-          surface={surface}
-          value={parsePreset}
-          onChange={setParsePreset}
-          disabled={disabled}
-        />
-      </View>
       <Pressable
         onPress={() => void pickPdf()}
         disabled={disabled}

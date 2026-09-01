@@ -23,16 +23,12 @@ import {
 } from "@/lib/onboarding/types";
 import { resolveGraiderApiUrl } from "@/lib/graider-fetch";
 import { appendDocumentToFormData } from "@/lib/picked-document";
-import ParsePresetPicker from "@/components/shared/ParsePresetPicker";
 import DeterminateProgressBar from "@/components/shared/DeterminateProgressBar";
 import {
   postFormDataWithProgress,
   resultFromProgressHttp,
 } from "@/lib/upload-progress";
-import {
-  defaultPresetForSurface,
-  type DocumentParsePreset,
-} from "@/lib/parse-presets";
+import { UNIFIED_PARSE_PRESET } from "@/lib/parse-presets";
 
 const DEFAULT_PROMPT = "Name two functions of the mitochondria.";
 const DEFAULT_CORRECT_ANSWER =
@@ -91,9 +87,6 @@ export default function OnboardingAnswerKeyPage() {
   const [busy, setBusy] = useState(false);
   const [workProgress, setWorkProgress] = useState<{ percent: number; label: string } | null>(
     null,
-  );
-  const [parsePreset, setParsePreset] = useState<DocumentParsePreset>(() =>
-    defaultPresetForSurface("answer_key_pdf"),
   );
   const [staged, setStaged] = useState<StagedUpload[]>([]);
 
@@ -217,9 +210,6 @@ export default function OnboardingAnswerKeyPage() {
         quality: 0.85,
       });
       if (result.canceled || !result.assets?.length) return;
-      if (parsePreset === "typed_pdf") {
-        setParsePreset(defaultPresetForSurface("answer_key_photo"));
-      }
       addStaged(
         result.assets.map((asset, index) => ({
           id: stagedId(asset.fileName || `key-${index + 1}.jpg`, asset.uri),
@@ -246,12 +236,6 @@ export default function OnboardingAnswerKeyPage() {
     setWorkProgress({ percent: 0, label: "Uploading…" });
     try {
       const formData = new FormData();
-      const hasImages = staged.some((item) => item.kind === "image");
-      const preset =
-        hasImages && parsePreset === "typed_pdf"
-          ? defaultPresetForSurface("answer_key_photo")
-          : parsePreset;
-      if (preset !== parsePreset) setParsePreset(preset);
       for (const item of staged) {
         appendDocumentToFormData(formData, item.kind === "pdf" ? "pdf" : "image", {
           uri: item.uri,
@@ -259,7 +243,7 @@ export default function OnboardingAnswerKeyPage() {
           mimeType: item.mimeType,
         });
       }
-      formData.append("parsePreset", preset);
+      formData.append("parsePreset", UNIFIED_PARSE_PRESET);
       const http = await postFormDataWithProgress({
         url: resolveGraiderApiUrl("/api/onboarding/parse-answer-key"),
         formData,
@@ -354,14 +338,6 @@ export default function OnboardingAnswerKeyPage() {
                 <Text className="mt-2 text-sm leading-relaxed text-ink-soft">
                   Add one or more PDFs or photos, then read them together.
                 </Text>
-                <View className="mt-4">
-                  <ParsePresetPicker
-                    surface="answer_key_pdf"
-                    value={parsePreset}
-                    onChange={setParsePreset}
-                    disabled={busy}
-                  />
-                </View>
                 <TouchableOpacity
                   onPress={() => void onPickPdf()}
                   disabled={busy}
