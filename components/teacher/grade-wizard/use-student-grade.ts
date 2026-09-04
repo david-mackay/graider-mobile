@@ -498,7 +498,7 @@ export function useStudentGrade(): UseStudentGradeReturn {
             previewJobId,
             testId,
             assignments: payloadAssignments,
-            idempotencyKey: `student-first-commit:${previewJobId}:${testId}:${payloadAssignments
+            idempotencyKey: `student-first-commit:v2:${previewJobId}:${testId}:${payloadAssignments
               .map((e) => `${e.pageIndex}:${e.studentId}`)
               .join("|")}`,
           }),
